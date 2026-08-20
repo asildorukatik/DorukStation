@@ -1,0 +1,212 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>DorukStation — UI Modes v0.36</title>
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<div id="viewport">
+  <!-- Full-bleed visual layer. It is intentionally OUTSIDE the 1920×1080 UI canvas,
+       so ultrawide/tall displays do not get empty side bars. -->
+  <div id="flowColor"></div>
+  <div id="photoBackground"></div>
+  <div id="gameBannerA" class="modern-game-banner"></div>
+  <div id="gameBannerB" class="modern-game-banner"></div>
+  <div id="waveFar" class="wave"></div>
+  <div id="waveMain" class="wave"></div>
+  <div id="waveNear" class="wave"></div>
+  <div id="backgroundShade"></div>
+
+  <!-- Boot also lives at viewport level so it covers EVERY pixel, not just the UI canvas. -->
+  <section id="bootScreen">
+    <div class="boot-lockup">
+      <img id="bootLogo" class="boot-logo" src="assets/branding/dorukstation-logo-bright.png" alt="DorukStation logo">
+      <div class="boot-name">DorukStation</div>
+    </div>
+  </section>
+
+  <section id="controllerGate" class="hidden" aria-label="Connect a controller">
+    <div class="controller-gate-panel">
+      <h1>Connect a controller to begin</h1>
+      <p>Connect a controller, then choose who is playing.</p>
+      <button id="playWithoutController" type="button">or play without one</button>
+      <small>Keyboard and mouse mode is intended for PC use and debugging.</small>
+    </div>
+  </section>
+
+  <section id="userSelect" aria-label="Choose DorukStation user">
+    <div class="user-select-panel">
+      <h1 id="userSelectTitle">Select User</h1>
+      <p id="userSelectSubtitle">Game saves, trophies and settings stay separate for every local user.</p>
+      <div id="userCards" class="user-cards"></div>
+      <div class="user-select-hint">← → Choose · ✕ / Enter Select</div>
+    </div>
+  </section>
+
+
+  <section id="createUserChoice" class="hidden" aria-label="Create or use guest account">
+    <div class="create-choice-panel">
+      <h1>Create User</h1>
+      <p>Choose whether this person should keep their data on this DorukStation.</p>
+      <div class="create-choice-list">
+        <button id="choicePermanent" class="create-choice-item focused" type="button">
+          <div class="choice-icon"><img src="assets/skin/flow/function/friend.png" alt=""></div>
+          <div><strong>Create New User</strong><span>Permanent account. Saves, trophies, settings and app data are kept in this user's own folder.</span></div>
+        </button>
+        <button id="choiceGuest" class="create-choice-item" type="button">
+          <div class="choice-icon guest-clock">◷</div>
+          <div><strong>Play as Guest</strong><span>Temporary session. Guest data is deleted when this controller disconnects, the guest switches user, or DorukStation shuts down/restarts.</span></div>
+        </button>
+      </div>
+      <div class="create-choice-warning">Guest accounts are temporary. Do not use Guest for worlds or progress you want to keep.</div>
+      <div class="create-user-hint">✕ / Enter Select · ○ / Esc Back</div>
+    </div>
+  </section>
+
+  <section id="createUserView" class="hidden" aria-label="Create DorukStation user">
+    <div class="create-user-title">Create User</div>
+    <div class="create-user-line"></div>
+    <div class="create-user-card">
+      <img src="assets/skin/flow/function/friend.png" alt="Guest avatar" class="create-user-avatar">
+      <button id="changeAvatarButton" class="create-avatar-button" type="button">Change Avatar</button>
+      <label class="create-name-label" for="createUserName">Name</label>
+      <div id="createNameRow" class="create-name-row focused">
+        <input id="createUserName" maxlength="24" autocomplete="off" spellcheck="false" placeholder="User">
+        <span class="create-name-check">✓</span>
+      </div>
+      <button id="createUserConfirm" class="create-user-confirm" type="button">Confirm</button>
+    </div>
+    <div class="create-user-hint">✕ / Enter · ○ / Esc Back</div>
+  </section>
+
+
+  <section id="avatarPicker" class="hidden" aria-label="Choose profile avatar">
+    <div class="avatar-picker-title">Avatar</div>
+    <div class="avatar-picker-line"></div>
+    <div class="avatar-picker-layout">
+      <aside>
+        <div class="avatar-picker-label">Select an Avatar</div>
+        <div id="avatarCategories" class="avatar-categories"></div>
+      </aside>
+      <div id="avatarGrid" class="avatar-grid"></div>
+    </div>
+    <div class="avatar-picker-hint">D-pad / Stick Move · ✕ Select · ○ Back</div>
+  </section>
+
+
+
+  <!-- Controller-friendly digital keyboard for console use. -->
+  <section id="digitalKeyboard" class="hidden" aria-label="On-screen keyboard">
+    <div class="osk-panel">
+      <div class="osk-header">
+        <h1 id="oskTitle">Enter Text</h1>
+        <div id="oskPageLabel">ABC</div>
+      </div>
+      <div class="osk-entry"><span id="oskValue"></span><span class="osk-caret" aria-hidden="true"></span></div>
+      <div class="osk-shortcuts" aria-label="Keyboard controller shortcuts">
+        <span>✕ Type</span><span>R2 Enter</span><span>L2 Shift / Caps</span><span>△ Symbols</span><span>□ Backspace</span><span>○ Leave</span>
+      </div>
+      <div id="oskKeys" class="osk-keys"></div>
+      <div class="osk-hint">D-pad / Stick Move · Hold to repeat</div>
+    </div>
+  </section>
+
+  <main id="stage" aria-label="DorukStation web shell">
+    <!-- Camera layer: the top function row is permanently visible. -->
+    <div id="cameraLayer">
+      <section id="quickRow" aria-label="Quick functions">
+        <div id="quickButtons"></div>
+        <div id="quickTitle"></div>
+        <div id="sessionStatus" class="session-status hidden" aria-label="Signed-in user and battery">
+          <img id="sessionAvatar" class="session-avatar" alt="">
+          <span id="sessionUserName"></span>
+          <span id="sessionInputIcon" class="session-input-icon">🎮</span>
+          <img id="sessionBatteryIcon" class="session-battery-icon" src="assets/system/battery-full.svg" alt="Battery">
+          <span id="sessionBatteryText">—</span>
+        </div>
+        <div id="topClock"><div id="clock">00:00</div><div id="dateText"></div></div>
+      </section>
+
+      <section id="homeArea">
+        <div id="appCarousel"></div>
+        <button id="startBox" type="button" aria-label="Open focused item"><span id="startBoxText">Play</span></button>
+        <div id="appTitle"></div>
+        <div id="appDescription"></div>
+        <div id="runningLabel" class="hidden">Running</div>
+        <div id="lowerWidget">
+          <div class="widget-title">Live Area</div>
+          <div id="widgetBody">Select an item to see details.</div>
+        </div>
+      </section>
+    </div>
+
+    <!-- Full pages for Settings, Notifications, Plus, Store, Friends, etc. -->
+    <section id="pageView" class="hidden" aria-label="Function page">
+      <header class="page-header">
+        <div class="page-icon-wrap"><img id="pageIcon" alt=""></div>
+        <div>
+          <div id="pageEyebrow">DorukStation</div>
+          <h1 id="pageTitle">Page</h1>
+          <p id="pageSubtitle"></p>
+        </div>
+        <div class="page-clock"><div id="pageClock">00:00</div><div id="pageDate"></div></div>
+      </header>
+      <div id="pageBody"></div>
+    </section>
+
+    <!-- ONLY app Options uses this right-side menu. -->
+    <div id="scrim" class="hidden"></div>
+    <aside id="rightMenu" class="hidden" aria-label="Application options">
+      <h2 id="menuTitle">Options</h2>
+      <div id="menuBody"></div>
+    </aside>
+
+    <!-- Running app switcher -->
+    <div id="switcher" class="hidden">
+      <div class="switcher-title">Running Applications</div>
+      <div id="switcherRow"></div>
+      <div class="switcher-hint">✕ Resume · Options Close · ○ Back</div>
+    </div>
+
+    <!-- Only invite / achievement / recording notifications appear here. -->
+    <div id="eventNotificationStack" aria-live="polite"></div>
+    <div id="systemNotificationStack" aria-live="polite"></div>
+
+    <pre id="debug" class="hidden"></pre>
+
+    <input id="htmlPicker" type="file" accept=".html,.htm,text/html" class="hidden">
+    <input id="backgroundPicker" type="file" accept="image/*" class="hidden">
+  </main>
+  <!-- Game surface is viewport-level, not inside the 1920×1080 shell canvas.
+       That gives every game the user's real available display resolution/aspect ratio. -->
+  <section id="appSurface" class="hidden" aria-label="Running application">
+    <div id="homeOverlayHint">PS / HOME → Home · Hold 1s → Quick Menu · SHARE → Share</div>
+  </section>
+
+  <section id="quickMenuOverlay" class="shell-side-overlay hidden" aria-label="Quick Menu">
+    <div class="quick-menu-panel">
+      <header>Quick Menu</header>
+      <div class="quick-menu-rule"></div>
+      <div class="quick-menu-columns">
+        <div id="quickMenuList" class="quick-menu-list"></div>
+        <div id="quickMenuDetail" class="quick-menu-detail"></div>
+      </div>
+      <div class="side-menu-user"><img src="assets/skin/flow/function/friend.png" alt=""><span id="quickMenuUser">User</span><span class="controller-mark">🎮</span></div>
+    </div>
+  </section>
+
+  <section id="shareMenuOverlay" class="shell-side-overlay hidden" aria-label="Share Menu">
+    <div class="share-menu-panel">
+      <header>Share</header>
+      <div class="quick-menu-rule"></div>
+      <div id="shareMenuList" class="share-menu-list"></div>
+      <div class="side-menu-user"><img src="assets/skin/flow/function/friend.png" alt=""><span id="shareMenuUser">User</span><span class="share-hint">○ Back · ✕ Select</span></div>
+    </div>
+  </section>
+</div>
+<script src="games/manifest.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

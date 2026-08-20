@@ -1,0 +1,33 @@
+DorukStation v0.36 — GitHub Pages patch
+
+WHY THIS PATCH EXISTS
+---------------------
+The local v0.36 build embeds the Dungeons soundtrack inside the Dungeons HTML/payload
+so it works reliably from local file:// mode. That makes individual files larger than
+GitHub's normal 100 MiB Git object limit.
+
+On GitHub Pages the site is served over HTTPS, so Dungeons can use the existing
+games/DungeonMusic/*.mp3 files directly instead. This patch replaces only:
+
+  games/DorukCraft-Dungeons.html
+  games/payloads/dorukcraft-dungeons.js
+
+with the small external-audio versions. It also adds .nojekyll.
+
+HOW TO APPLY
+------------
+Extract this ZIP directly into the ROOT of your extracted DorukStation-Web-v0.36 folder
+and allow it to overwrite the two Dungeons files.
+
+DO NOT delete:
+  games/DungeonMusic/
+
+That folder contains the actual Dungeons soundtrack and is required on GitHub Pages.
+
+Then verify no file is >= 100 MiB:
+
+  find . -type f -size +99M -print
+
+The command should print nothing.
+
+After that, commit and push the folder to GitHub.
