@@ -132,7 +132,7 @@ const S={
  pageOpen:false,pageItems:[],pageIndex:0,pageCols:1,pageMode:"list",pageStack:[],pageReturnZone:"home",
  switcher:false,switcherIndex:0,appSurface:false,currentRunningId:null,
  lastButtons:[],axisLatch:false,
- userSelectOpen:true,userIndex:0,createChoiceOpen:false,createChoiceIndex:0,createUserOpen:false,createUserIndex:0,
+ userSelectOpen:false,userIndex:0,createChoiceOpen:false,createChoiceIndex:0,createUserOpen:false,createUserIndex:0,
  quickMenuOpen:false,quickMenuIndex:0,quickMenuPane:"main",quickMenuSubIndex:0,shareMenuOpen:false,shareMenuIndex:0,
  theme:{kind:"flow",id:"default"},sounds:true,animation:true,
  username:"User",customBackground:null
@@ -2193,10 +2193,21 @@ chooseAudioOutput=async function(){
    Audio(...), so patching HTMLMediaElement.play catches its music and SFX
    without changing DorukCraft's own sound code. */
 function v23InstallFrameDeviceAudio(entry){
- /* v0.36: game media follows the browser/OS output directly.
-    Calling setSinkId() asynchronously before every game play() can lose the
-    browser's user-activation window and make game music silently fail. */
- return entry;
+ try{
+  const w=entry?.iframe?.contentWindow;if(!w)return;
+  const proto=w.HTMLMediaElement?.prototype;if(!proto||proto.__dorukstationDeviceAudioPatched)return;
+  const nativePlay=proto.play;
+  Object.defineProperty(proto,"__dorukstationDeviceAudioPatched",{value:true,configurable:true});
+  proto.play=function(...args){
+   const media=this;
+   return Promise.resolve(v23EnsureDeviceSink()).then(async sink=>{
+    if(sink&&typeof media.setSinkId==="function"&&media.sinkId!==sink)try{await media.setSinkId(sink)}catch{}
+    return nativePlay.apply(media,args);
+   });
+  };
+  /* Also retarget media objects already present in the game document. */
+  v23EnsureDeviceSink().then(sink=>{if(!sink)return;try{for(const m of w.document.querySelectorAll("audio,video"))if(typeof m.setSinkId==="function")m.setSinkId(sink).catch(()=>{})}catch{}});
+ }catch{} // cross-origin games remain browser/OS routed
 }
 const _v23MakeGameViewportResponsive=makeGameViewportResponsive;
 makeGameViewportResponsive=function(entry){const out=_v23MakeGameViewportResponsive(entry);v23InstallFrameDeviceAudio(entry);return out};
@@ -2983,7 +2994,7 @@ updateDebug=function(...args){
 
 
 /* ========================================================================== */
-/* DorukStation Web v0.36 — bundled Dungeons companion-audio fix              */
+/* DorukStation Web v0.35 — bundled Dungeons companion-audio fix              */
 /*                                                                            */
 /* Folder games loaded through srcdoc receive <base href=".../games/">.       */
 /* DorukCraft Dungeons therefore expects its relative DungeonMusic/... URLs   */
@@ -2995,8 +3006,653 @@ const v34UpdateDebugBase=updateDebug;
 updateDebug=function(...args){
  const out=v34UpdateDebugBase(...args),d=document.querySelector('#debug');
  if(d&&!d.classList.contains('hidden')){
-  d.textContent=d.textContent.replace(/^v0\.\d+/m,'v0.36');
+  d.textContent=d.textContent.replace(/^v0\.\d+/m,'v0.35');
   d.textContent+='\ndungeonsMusic=bundled games/DungeonMusic';
  }
  return out;
 };
+
+
+
+
+/* ========================================================================== */
+/* v0.37 carry-forward — v0.34 Home cleanup + System Apps + real glitter      */
+/* ========================================================================== */
+const V37_HIDDEN_HOME_IDS=new Set(['gallery','explorer','usbmusic','disc']);
+const V37_TRAILING_SYSTEM_IDS=['browser','livefromps','shareplay'];
+function v37IsGameApp(a){return !!a&&(a.folderGame||a.userAdded||a.id==='dorukcraft'||a.id==='dorukcraft-dungeons'||a.action==='launch'||a.action==='remote')}
+function v37InstallStoreHomeTile(){if(!apps.some(a=>a.id==='store'))apps.push({id:'store',name:'DorukStation Store',desc:'Browse games and applications.',image:'assets/skin/store.png',type:'image',action:'store',live:'Store services are not connected in this web prototype.'})}
+v37InstallStoreHomeTile();for(let i=apps.length-1;i>=0;i--)if(V37_HIDDEN_HOME_IDS.has(apps[i]?.id))apps.splice(i,1);
+ensureLibraryLast=function(){
+ const focusId=apps[S.app]?.id||null;v37InstallStoreHomeTile();const seen=new Set(),take=id=>{const a=apps.find(x=>x.id===id&&!seen.has(x));if(a)seen.add(a);return a},ordered=[];
+ for(const id of ['whatsnew','store']){const a=take(id);if(a)ordered.push(a)}
+ for(const a of apps)if(!seen.has(a)&&!V37_HIDDEN_HOME_IDS.has(a.id)&&v37IsGameApp(a)){seen.add(a);ordered.push(a)}
+ for(const a of apps)if(!seen.has(a)&&!V37_HIDDEN_HOME_IDS.has(a.id)&&!V37_TRAILING_SYSTEM_IDS.includes(a.id)&&a.id!=='library'){seen.add(a);ordered.push(a)}
+ for(const id of V37_TRAILING_SYSTEM_IDS){const a=take(id);if(a)ordered.push(a)}const lib=take('library');if(lib)ordered.push(lib);
+ apps.splice(0,apps.length,...ordered);if(focusId){const ni=apps.findIndex(a=>a.id===focusId);if(ni>=0)S.app=ni}else S.app=Math.max(0,Math.min(S.app,apps.length-1));
+};
+ensureLibraryLast();
+function v37OpenStorePage(returnZone='home'){openPage({title:'DorukStation Store',subtitle:'Games and applications. Store services are not connected in this web prototype.',icon:'assets/skin/store.png',returnZone,mode:'grid',cols:4,items:[{title:'Featured',note:'Prototype',disabled:true},{title:'Games',note:'Prototype',disabled:true},{title:'Apps',note:'Prototype',disabled:true},{title:'Library',note:'Open your local Library',action:()=>{backPage();S.zone='home';ensureLibraryLast();S.app=apps.findIndex(a=>a.id==='library');render()}}]})}
+const v37ActivateAppStoreBase=activateApp;
+activateApp=function(app){if(app?.id==='store'||app?.action==='store'){selectSound();v37OpenStorePage('home');return}return v37ActivateAppStoreBase(app)};
+function v37OpenSystemAppsPage(){openPage({title:'System Apps',subtitle:'Utilities that do not need permanent Home tiles.',icon:'assets/skin/flow/function/setting.png',items:[
+ {title:'Capture Gallery',icon:'assets/skin/flow/content/gallery.png',action:()=>openPage({title:'Capture Gallery',subtitle:'Screenshots and recordings.',icon:'assets/skin/flow/content/gallery.png',mode:'grid',cols:3,items:[{title:'Screenshots',note:'0',disabled:true},{title:'Video Clips',note:'0',disabled:true},{title:'Recording integration',note:'Native build later',disabled:true}]},true)},
+ {title:'File Explorer',icon:'assets/skin/flow/content/library.png',action:()=>openPage({title:'File Explorer',subtitle:'Browser security limits direct filesystem browsing.',icon:'assets/skin/flow/content/library.png',items:[{title:'Open Library',note:'Add or launch HTML apps',action:()=>{while(S.pageOpen)backPage();S.zone='home';ensureLibraryLast();S.app=apps.findIndex(a=>a.id==='library');render()}},{title:'Native filesystem access',note:'Planned for a native DorukStation build',disabled:true}]},true)},
+ {title:'USB Music Player',icon:'assets/skin/flow/content/usbmusic.png',action:()=>openPage({title:'USB Music Player',subtitle:'Removable-media music player.',icon:'assets/skin/flow/content/usbmusic.png',items:[{title:'No USB music source connected',note:'Native removable-media scanning comes later',disabled:true}]},true)},
+ {title:'Disc',icon:'assets/skin/flow/content/disc.png',action:()=>openPage({title:'Disc',subtitle:'Physical game/media support.',icon:'assets/skin/flow/content/disc.png',items:[{title:'No disc detected',note:'Disc detection belongs in the native build',disabled:true}]},true)}
+]},true)}
+const v37OpenSettingsSystemAppsBase=openSettingsPage;
+openSettingsPage=function(){v37OpenSettingsSystemAppsBase();if(!S.pageOpen||document.querySelector('#pageTitle')?.textContent!=='Settings')return;if(!S.pageItems.some(x=>x.title==='System Apps')){const systemAt=S.pageItems.findIndex(x=>x.title==='System');S.pageItems.splice(systemAt>=0?systemAt:S.pageItems.length-1,0,{title:'System Apps',icon:'▦',note:'Gallery · Files · USB Music · Disc',action:v37OpenSystemAppsPage})}renderPage()};
+function v37Seeded(i){let x=(i+1)*2654435761>>>0;x^=x<<13;x^=x>>>17;x^=x<<5;return (x>>>0)/4294967295}
+function v37InitModernGlitter(){const host=document.querySelector('#modernGlitter');if(!host||host.childElementCount)return;const frag=document.createDocumentFragment();for(let i=0;i<96;i++){const p=document.createElement('i');p.className='v34-glitter'+(i%5===0?' blue':'')+(i%13===0?' big':'');p.style.setProperty('--x',(v37Seeded(i*4)*100).toFixed(2)+'%');p.style.setProperty('--y',(v37Seeded(i*4+1)*100).toFixed(2)+'%');p.style.setProperty('--s',(1.2+v37Seeded(i*4+2)*3.6).toFixed(2)+'px');p.style.setProperty('--d',(2.4+v37Seeded(i*4+3)*5.8).toFixed(2)+'s');p.style.setProperty('--delay',(-v37Seeded(i*7+9)*7).toFixed(2)+'s');frag.appendChild(p)}host.appendChild(frag)}
+v37InitModernGlitter();
+
+
+/* ========================================================================== */
+/* DorukStation Web v0.37 — mobile / touch virtual controller                 */
+/* ========================================================================== */
+window.__dorukstationVersion='0.37';
+
+/* v0.36 carry-forward: do not delay a game's HTMLMediaElement.play() behind
+   asynchronous setSinkId(). Browser user-activation is short-lived on mobile,
+   and delaying play can turn a valid tap into NotAllowedError/silence. System
+   UI sounds may still use DorukStation's selected sink; games use browser/OS. */
+v23InstallFrameDeviceAudio=function(){return};
+
+const V37_MOBILE_DEFAULTS={enabled:'auto',visibility:'both',opacity:.74,size:'medium',sensitivity:1,haptics:true};
+const v37Pad={
+ id:'DorukStation Virtual Touch Controller',index:0,connected:true,mapping:'standard',timestamp:0,
+ axes:[0,0,0,0],buttons:Array.from({length:17},()=>({pressed:false,touched:false,value:0}))
+};
+const v37Pointers=new Map();
+let v37HomeHoldTimer=null,v37HomeLong=false,v37ShellAxisDir='',v37ShellAxisNext=0,v37VirtualConnectedToGame=false;
+
+function v37TouchCapable(){return !!(navigator.maxTouchPoints>0||matchMedia?.('(pointer: coarse)')?.matches||('ontouchstart' in window))}
+function v37PhysicalPads(){try{return [...(navigator.getGamepads?.()||[])].filter(Boolean)}catch{return []}}
+function v37MobilePrefs(){
+ let p={...V37_MOBILE_DEFAULTS};
+ try{if(currentProfile)p=Object.assign(p,safeJSON(pGet('mobileControls','{}'),{}))}catch{}
+ p.enabled=['auto','on','off'].includes(p.enabled)?p.enabled:'auto';p.visibility=['both','home','games'].includes(p.visibility)?p.visibility:'both';
+ p.opacity=Math.max(.4,Math.min(.95,Number(p.opacity)||.74));p.size=['small','medium','large'].includes(p.size)?p.size:'medium';
+ p.sensitivity=Math.max(.65,Math.min(1.5,Number(p.sensitivity)||1));p.haptics=p.haptics!==false;return p;
+}
+function v37SaveMobilePrefs(p){if(currentProfile)pSet('mobileControls',JSON.stringify(p));v37SyncMobileControls(true)}
+function v37MobileModeAllows(p){if(p.enabled==='off')return false;if(p.enabled==='on')return true;return v37TouchCapable()&&v37PhysicalPads().length===0}
+function v37InGameContext(){return !!S.appSurface}
+function v37VisibilityAllows(p){const g=v37InGameContext();return p.visibility==='both'||(g&&p.visibility==='games')||(!g&&p.visibility==='home')}
+function v37ShouldShow(){
+ const p=v37MobilePrefs();if(!v37MobileModeAllows(p)||!v37VisibilityAllows(p))return false;
+ if(S.digitalKeyboardOpen)return false;
+ return true;
+}
+function v37MobileGameActive(){return v37ShouldShow()&&v37InGameContext()&&!S.quickMenuOpen&&!S.shareMenuOpen}
+function v37Haptic(ms=11){const p=v37MobilePrefs();if(p.haptics)try{navigator.vibrate?.(ms)}catch{}}
+function v37ResetPad(){
+ for(let i=0;i<v37Pad.buttons.length;i++){const b=v37Pad.buttons[i];b.pressed=false;b.touched=false;b.value=0}
+ v37Pad.axes.fill(0);v37Pad.timestamp=performance.now();
+ for(const el of document.querySelectorAll('#mobileControls .mc-active'))el.classList.remove('mc-active');
+ for(const k of document.querySelectorAll('#mobileControls .mc-stick-knob'))k.style.transform='translate3d(0,0,0)';
+}
+function v37ButtonSet(i,on,value=on?1:0){
+ const b=v37Pad.buttons[i];if(!b)return;b.pressed=!!on;b.touched=!!on;b.value=on?Math.max(0,Math.min(1,value)):0;v37Pad.timestamp=performance.now();
+}
+function v37ButtonView(b){return {pressed:!!b?.pressed,touched:!!b?.touched,value:Number(b?.value)||0}}
+function v37MergedPad(physical){
+ const p=v37MobilePrefs(),sens=p.sensitivity,axes=[0,0,0,0];
+ for(let i=0;i<4;i++){const tv=(v37Pad.axes[i]||0)*sens,pv=Number(physical?.axes?.[i]||0);axes[i]=Math.max(-1,Math.min(1,Math.abs(tv)>.035?tv:pv))}
+ const buttons=Array.from({length:Math.max(17,physical?.buttons?.length||0)},(_,i)=>{
+  /* SHARE and PS/HOME belong to DorukStation, not the running game. */
+  if(i===8||i===16)return {pressed:false,touched:false,value:0};
+  const t=v37Pad.buttons[i],r=physical?.buttons?.[i],value=Math.max(Number(t?.value||0),Number(r?.value||0));
+  return {pressed:!!t?.pressed||!!r?.pressed||value>.5,touched:!!t?.touched||!!r?.touched||value>0,value};
+ });
+ return {id:physical?.id?`${physical.id} + DorukStation Touch`:'DorukStation Virtual Touch Controller',index:0,connected:true,mapping:'standard',timestamp:performance.now(),axes,buttons,vibrationActuator:physical?.vibrationActuator||null,hapticActuators:physical?.hapticActuators||[]};
+}
+function v37GamePadsForEntry(entry){
+ if(!entry||entry.suspended)return [];
+ const owner=entry.profileId,idx=owner?profileAssignments.get(owner):null;
+ const all=v37PhysicalPads(),physical=Number.isInteger(idx)?all.find(g=>g.index===idx):null;
+ if(v37MobileGameActive())return [v37MergedPad(physical)];
+ if(!physical)return [];
+ return [physical];
+}
+function v37DispatchVirtualGamepad(kind){
+ const e=getRunningEntry();if(!e?.iframe?.contentWindow||e.suspended)return;
+ try{const w=e.iframe.contentWindow,ev=new w.Event(kind);Object.defineProperty(ev,'gamepad',{value:v37MergedPad(null)});w.dispatchEvent(ev)}catch{}
+}
+function v37SyncVirtualGameConnection(){
+ const active=v37MobileGameActive(),e=getRunningEntry();
+ if(active&&!v37VirtualConnectedToGame&&e&&!e.suspended){v37VirtualConnectedToGame=true;v37DispatchVirtualGamepad('gamepadconnected')}
+ else if((!active||!e||e.suspended)&&v37VirtualConnectedToGame){v37VirtualConnectedToGame=false;v37DispatchVirtualGamepad('gamepaddisconnected')}
+}
+function v37SyncMobileControls(reset=false){
+ const el=document.querySelector('#mobileControls');if(!el)return;const p=v37MobilePrefs(),show=v37ShouldShow();
+ el.classList.toggle('hidden',!show);el.style.setProperty('--mc-opacity',String(p.opacity));
+ document.body.classList.toggle('mc-size-small',p.size==='small');document.body.classList.toggle('mc-size-medium',p.size==='medium');document.body.classList.toggle('mc-size-large',p.size==='large');
+ el.dataset.context=v37InGameContext()?'game':'shell';el.dataset.style=(typeof v26UiMode==='function'?v26UiMode():'classic');
+ if((reset||!show)&&!show)v37ResetPad();v37SyncVirtualGameConnection();
+}
+
+/* Replace the final iframe Gamepad API route. Physical pads stay account-owned;
+   touch becomes standard controller slot 0 so games that only read [0] work. */
+const v37InstallInputPauseBase=installInputPauseShim;
+installInputPauseShim=function(e){
+ v37InstallInputPauseBase(e);
+ try{
+  const w=e?.iframe?.contentWindow;if(!w)return;
+  Object.defineProperty(w.navigator,'getGamepads',{configurable:true,value:()=>{
+   if(w.__dorukstationSuspended||w.__dorukstationInputBlocked||w.__dorukstationGamepadBlocked)return [];
+   return v37GamePadsForEntry(e);
+  }});
+  w.__dorukstationV37TouchGamepad=true;
+ }catch{}
+};
+
+function v37MoveDirection(dir){
+ if(!dir)return;
+ if(S.quickMenuOpen){if(dir==='U')moveQuickMenu(0,-1);else if(dir==='D')moveQuickMenu(0,1);else if(dir==='L')moveQuickMenu(-1,0);else if(dir==='R')moveQuickMenu(1,0);return}
+ if(S.shareMenuOpen){if(dir==='U')moveShareMenu(-1);else if(dir==='D')moveShareMenu(1);return}
+ if(S.avatarPickerOpen){if(dir==='U')moveAvatar(0,-1);else if(dir==='D')moveAvatar(0,1);else if(dir==='L')moveAvatar(-1,0);else if(dir==='R')moveAvatar(1,0);return}
+ if(S.userSelectOpen){if(dir==='L')moveUserSelection(-1);else if(dir==='R')moveUserSelection(1);return}
+ if(S.createChoiceOpen){if(dir==='U')moveCreateChoice(-1);else if(dir==='D')moveCreateChoice(1);return}
+ if(S.createUserOpen){if(dir==='U')moveCreateUser(-1);else if(dir==='D')moveCreateUser(1);return}
+ if(v37InGameContext())return;
+ if(dir==='U')move(0,-1);else if(dir==='D')move(0,1);else if(dir==='L')move(-1,0);else if(dir==='R')move(1,0);
+}
+function v37Cross(){
+ const gate=document.querySelector('#controllerGate');if(gate&&!gate.classList.contains('hidden')&&!currentProfile){document.querySelector('#playWithoutController')?.click();return}
+ if(S.quickMenuOpen){activateQuickMenu();return}if(S.shareMenuOpen){activateShareMenu();return}
+ if(S.avatarPickerOpen){if(avatarFocusArea==='categories'){avatarFocusArea='grid';selectSound();renderAvatarPicker()}else chooseAvatar();return}
+ if(S.userSelectOpen){activateUserSelection();return}if(S.createChoiceOpen){activateCreateChoice();return}if(S.createUserOpen){activateCreateUser();return}
+ if(v37InGameContext())return;activate();
+}
+function v37Circle(){
+ if(v37InGameContext()&&!S.quickMenuOpen&&!S.shareMenuOpen)return;
+ if(S.quickMenuOpen){backQuickMenu();return}if(S.shareMenuOpen){closeShareMenu();return}
+ if(S.avatarPickerOpen){closeAvatarPicker();return}if(S.createChoiceOpen){closeCreateChoice();return}if(S.createUserOpen){closeCreateUser();return}
+ back();
+}
+function v37Options(){if(v37InGameContext()&&!S.quickMenuOpen&&!S.shareMenuOpen)return;options()}
+function v37Share(){if(!currentProfile)return;if(!S.shareMenuOpen)openShareMenu();else closeShareMenu()}
+function v37HomeDown(){
+ if(v37HomeHoldTimer)return;v37HomeLong=false;
+ v37HomeHoldTimer=setTimeout(()=>{v37HomeHoldTimer=null;v37HomeLong=true;if(currentProfile)openQuickMenu()},1000);
+}
+function v37HomeUp(){
+ if(v37HomeHoldTimer){clearTimeout(v37HomeHoldTimer);v37HomeHoldTimer=null}
+ if(!v37HomeLong&&currentProfile)psShortPress();v37HomeLong=false;
+}
+function v37L1R1(i){if(v37InGameContext())return;if(S.zone==='home'){if(i===4)v19JumpHomeEnd(false);if(i===5)v19JumpHomeEnd(true)}}
+
+function v37ButtonShellDown(i,el){
+ el?.classList.add('mc-active');v37Haptic();
+ if(i>=12&&i<=15){v37MoveDirection({12:'U',13:'D',14:'L',15:'R'}[i]);return}
+ if(i===0)v37Cross();else if(i===1)v37Circle();else if(i===4||i===5)v37L1R1(i);
+}
+function v37ButtonShellUp(i,el){el?.classList.remove('mc-active')}
+function v37BindButton(el){
+ const i=Number(el.dataset.mcButton),system=el.dataset.mcSystem||'';
+ el.addEventListener('contextmenu',ev=>ev.preventDefault());
+ el.addEventListener('pointerdown',ev=>{
+  ev.preventDefault();ev.stopPropagation();try{el.setPointerCapture(ev.pointerId)}catch{};v37Pointers.set(ev.pointerId,{type:'button',i,el,system});
+  if(Number.isInteger(i))v37ButtonSet(i,true);
+  if(system==='home'){v37HomeDown();el.classList.add('mc-active');v37Haptic();return}
+  if(system==='share'){v37Share();el.classList.add('mc-active');v37Haptic();return}
+  if(system==='options'&&!v37InGameContext()){v37Options();el.classList.add('mc-active');v37Haptic();return}
+  if(!v37InGameContext()||S.quickMenuOpen||S.shareMenuOpen)v37ButtonShellDown(i,el);else{el.classList.add('mc-active');v37Haptic()}
+ });
+ const end=ev=>{
+  const p=v37Pointers.get(ev.pointerId);if(!p||p.el!==el)return;ev.preventDefault();ev.stopPropagation();v37Pointers.delete(ev.pointerId);
+  if(Number.isInteger(i))v37ButtonSet(i,false);
+  if(system==='home')v37HomeUp();v37ButtonShellUp(i,el);
+ };
+ el.addEventListener('pointerup',end);el.addEventListener('pointercancel',end);el.addEventListener('lostpointercapture',end);
+}
+function v37StickUpdate(el,ev,side){
+ const rect=el.getBoundingClientRect(),cx=rect.left+rect.width/2,cy=rect.top+rect.height/2,dx=ev.clientX-cx,dy=ev.clientY-cy,r=Math.max(24,rect.width*.33),mag=Math.hypot(dx,dy),k=mag>r?r/mag:1,x=dx*k/r,y=dy*k/r;
+ const dead=.08,ax=Math.abs(x)<dead?0:x,ay=Math.abs(y)<dead?0:y,base=side==='left'?0:2;v37Pad.axes[base]=Math.max(-1,Math.min(1,ax));v37Pad.axes[base+1]=Math.max(-1,Math.min(1,ay));v37Pad.timestamp=performance.now();
+ const knob=el.querySelector('.mc-stick-knob'),px=(dx*k)*.62,py=(dy*k)*.62;if(knob)knob.style.transform=`translate3d(${px}px,${py}px,0)`;
+}
+function v37BindStick(el){
+ const side=el.dataset.mcStick;el.addEventListener('contextmenu',ev=>ev.preventDefault());
+ el.addEventListener('pointerdown',ev=>{ev.preventDefault();ev.stopPropagation();try{el.setPointerCapture(ev.pointerId)}catch{};v37Pointers.set(ev.pointerId,{type:'stick',side,el});v37StickUpdate(el,ev,side);v37Haptic(8)});
+ el.addEventListener('pointermove',ev=>{const p=v37Pointers.get(ev.pointerId);if(p?.el===el)v37StickUpdate(el,ev,side)});
+ const end=ev=>{const p=v37Pointers.get(ev.pointerId);if(p?.el!==el)return;ev.preventDefault();v37Pointers.delete(ev.pointerId);const base=side==='left'?0:2;v37Pad.axes[base]=0;v37Pad.axes[base+1]=0;v37Pad.timestamp=performance.now();const knob=el.querySelector('.mc-stick-knob');if(knob)knob.style.transform='translate3d(0,0,0)'};
+ el.addEventListener('pointerup',end);el.addEventListener('pointercancel',end);el.addEventListener('lostpointercapture',end);
+}
+function v37ShellStickFrame(now){
+ if(v37InGameContext()&&!S.quickMenuOpen&&!S.shareMenuOpen){v37ShellAxisDir='';return}
+ const x=v37Pad.axes[0],y=v37Pad.axes[1],threshold=.57;let dir='';
+ if(Math.abs(x)>Math.abs(y)&&Math.abs(x)>threshold)dir=x<0?'L':'R';else if(Math.abs(y)>threshold)dir=y<0?'U':'D';
+ if(!dir){v37ShellAxisDir='';v37ShellAxisNext=0;return}
+ if(dir!==v37ShellAxisDir||now>=v37ShellAxisNext){v37MoveDirection(dir);v37ShellAxisDir=dir;v37ShellAxisNext=now+(dir===v37ShellAxisDir?150:260)}
+}
+function v37MobileFrame(now){v37ShellStickFrame(now);requestAnimationFrame(v37MobileFrame)}
+
+function v37MobileSettingItems(){
+ const p=v37MobilePrefs(),enabledLabel={auto:'Auto',on:'On',off:'Off'}[p.enabled],visLabel={both:'Home + Games',home:'Home only',games:'Games only'}[p.visibility];
+ return [
+  {title:'Touch Controls',note:enabledLabel,action:()=>{p.enabled=p.enabled==='auto'?'on':p.enabled==='on'?'off':'auto';v37SaveMobilePrefs(p);v37RefreshMobileSettings()}},
+  {title:'Show Controls',note:visLabel,action:()=>{p.visibility=p.visibility==='both'?'home':p.visibility==='home'?'games':'both';v37SaveMobilePrefs(p);v37RefreshMobileSettings()}},
+  {title:'Style',note:`Follows ${typeof v26UiMode==='function'?v26UiModeLabel():'Classic'} UI`,disabled:true},
+  {title:'Button Size',note:p.size[0].toUpperCase()+p.size.slice(1),action:()=>{p.size=p.size==='small'?'medium':p.size==='medium'?'large':'small';v37SaveMobilePrefs(p);v37RefreshMobileSettings()}},
+  {title:'Opacity',note:`${Math.round(p.opacity*100)}%`,action:()=>{p.opacity=p.opacity<.6?.74:p.opacity<.82?.9:.52;v37SaveMobilePrefs(p);v37RefreshMobileSettings()}},
+  {title:'Stick Sensitivity',note:`${p.sensitivity.toFixed(2)}×`,action:()=>{p.sensitivity=p.sensitivity<.9?1:p.sensitivity<1.15?1.25:.8;v37SaveMobilePrefs(p);v37RefreshMobileSettings()}},
+  {title:'Touch Vibration',note:p.haptics?'On':'Off',action:()=>{p.haptics=!p.haptics;v37SaveMobilePrefs(p);v37RefreshMobileSettings()}},
+  {title:'Controller Behavior',note:'Auto hides touch controls when a real controller is connected',disabled:true},
+  {title:'Game Compatibility',note:'Exposed as a standard Gamepad in slot 0',disabled:true}
+ ];
+}
+function v37RefreshMobileSettings(){if($('#pageTitle')?.textContent!=='Mobile Controls')return;S.pageItems=v37MobileSettingItems();S.pageIndex=Math.min(S.pageIndex,S.pageItems.length-1);renderPage()}
+function openMobileControlsPage(){openPage({title:'Mobile Controls',subtitle:'Touch controller for DorukStation and HTML games. Classic/Modern style follows UI Mode.',icon:'assets/skin/flow/function/setting.png',items:v37MobileSettingItems()},true)}
+
+const v37OpenSettingsBase=openSettingsPage;
+openSettingsPage=function(){
+ v37OpenSettingsBase();if(!S.pageOpen||$('#pageTitle')?.textContent!=='Settings')return;
+ if(!S.pageItems.some(x=>x.title==='Mobile Controls')){const ui=S.pageItems.findIndex(x=>x.title==='UI Mode'),at=ui>=0?ui+1:Math.max(0,S.pageItems.findIndex(x=>x.title==='Themes'));S.pageItems.splice(at,0,{title:'Mobile Controls',icon:'◎',note:v37MobilePrefs().enabled==='off'?'Off':'Touch controller',action:openMobileControlsPage})}
+ renderPage();
+};
+
+const v37LoadProfileBase=loadProfileState;
+loadProfileState=function(profile){const out=v37LoadProfileBase(profile);setTimeout(()=>v37SyncMobileControls(true),0);return out};
+const v37RenderBase=render;
+render=function(...args){const out=v37RenderBase(...args);requestAnimationFrame(()=>v37SyncMobileControls(false));return out};
+const v37ResumeBase=resumeApp;
+resumeApp=function(id){const out=v37ResumeBase(id);requestAnimationFrame(()=>v37SyncMobileControls(true));return out};
+const v37SuspendBase=suspendToHome;
+suspendToHome=function(...args){const out=v37SuspendBase(...args);requestAnimationFrame(()=>v37SyncMobileControls(true));return out};
+const v37SetGameSuspendedBase=setGameSuspended;
+setGameSuspended=function(e,suspended){const out=v37SetGameSuspendedBase(e,suspended);requestAnimationFrame(()=>v37SyncMobileControls(!!suspended));return out};
+const v37ApplyThemeBase=applyTheme;
+applyTheme=function(...args){const out=v37ApplyThemeBase(...args);requestAnimationFrame(()=>v37SyncMobileControls(false));return out};
+
+window.addEventListener('gamepadconnected',()=>v37SyncMobileControls(true));window.addEventListener('gamepaddisconnected',()=>setTimeout(()=>v37SyncMobileControls(true),80));
+window.addEventListener('resize',()=>v37SyncMobileControls(false));window.addEventListener('orientationchange',()=>setTimeout(()=>v37SyncMobileControls(false),100));
+document.addEventListener('visibilitychange',()=>{if(document.hidden)v37ResetPad()});
+for(const el of document.querySelectorAll('#mobileControls [data-mc-button],#mobileControls [data-mc-system]'))v37BindButton(el);
+for(const el of document.querySelectorAll('#mobileControls [data-mc-stick]'))v37BindStick(el);
+requestAnimationFrame(v37MobileFrame);setInterval(()=>v37SyncMobileControls(false),350);v37SyncMobileControls(true);
+
+/* Debug marker. */
+const v37UpdateDebugBase=updateDebug;
+updateDebug=function(...args){const out=v37UpdateDebugBase(...args),d=document.querySelector('#debug');if(d&&!d.classList.contains('hidden')){const p=v37MobilePrefs();d.textContent=d.textContent.replace(/^v0\.\d+/m,'v0.37');d.textContent+=`\nmobile=${p.enabled}/${p.visibility} visible=${v37ShouldShow()?'yes':'no'} virtualGamepad=${v37MobileGameActive()?'on':'off'}`}return out};
+
+
+/* ========================================================================== */
+/* DorukStation Web v0.38 — persistent Input Mode detection                   */
+/* ========================================================================== */
+window.__dorukstationVersion='0.38';
+
+const V38_INPUT_MODE_KEY='ds-v38-input-mode';
+const V38_INPUT_MODES=new Set(['mobile','pc','controller']);
+let v38DetectedMode=(()=>{try{const m=localStorage.getItem(V38_INPUT_MODE_KEY)||'';return V38_INPUT_MODES.has(m)?m:''}catch{return ''}})();
+const v38GatePadState=new Map();
+
+function v38InputMode(){return V38_INPUT_MODES.has(v38DetectedMode)?v38DetectedMode:''}
+function v38InputModeLabel(m=v38InputMode()){return m==='mobile'?'Mobile Touch':m==='controller'?'Controller':m==='pc'?'PC Keyboard & Mouse':'Detecting'}
+function v38SetInputMode(mode,{persist=true,announce=false}={}){
+ if(!V38_INPUT_MODES.has(mode))return false;
+ const changed=v38DetectedMode!==mode;v38DetectedMode=mode;
+ if(persist)try{localStorage.setItem(V38_INPUT_MODE_KEY,mode)}catch{}
+ if(mode!=='mobile')v37ResetPad();
+ v37SyncMobileControls(true);v38UpdateGateCopy();
+ try{updateSessionStatus(true)}catch{}
+ if(announce&&changed&&currentProfile)try{pushSystemNotification('',`Input Mode: ${v38InputModeLabel(mode)}`,'Change it any time in Settings → Input Mode.',currentProfile)}catch{}
+ return true;
+}
+function v38GateVisible(){const g=document.querySelector('#controllerGate');return !!g&&!g.classList.contains('hidden')&&!currentProfile}
+function v38UpdateGateCopy(){
+ const gate=document.querySelector('#controllerGate');if(!gate)return;gate.classList.add('v38-input-detect');
+ const title=gate.querySelector('h1'),hint=document.querySelector('#inputDetectHint'),status=document.querySelector('#inputModeGateStatus'),mode=v38InputMode();
+ if(title)title.textContent='Press any button or click/tap anywhere';
+ if(hint)hint.textContent=mode?`Current Input Mode: ${v38InputModeLabel(mode)}`:'Touch → Mobile · Keyboard / Mouse → PC · Controller → Controller';
+ if(status)status.textContent=mode?`Input Mode is locked to ${v38InputModeLabel(mode)} until you change it in Settings.`:'DorukStation will remember the detected Input Mode until you change it in Settings.';
+ const old=document.querySelector('#playWithoutController');if(old){old.classList.add('hidden');old.setAttribute('aria-hidden','true')}
+}
+
+/* Mobile overlay is now controlled ONLY by explicit Mobile Input Mode. Merely
+   having a touchscreen, coarse pointer or maxTouchPoints no longer enables it. */
+v37MobileModeAllows=function(){return v38InputMode()==='mobile'};
+
+/* Games receive exactly the selected input class: virtual pad in Mobile mode,
+   the assigned physical pad in Controller mode, and no Gamepad in PC mode. */
+v37GamePadsForEntry=function(entry){
+ if(!entry||entry.suspended)return [];
+ const mode=v38InputMode();
+ if(mode==='mobile')return v37MobileGameActive()?[v37MergedPad(null)]:[];
+ if(mode!=='controller')return [];
+ const owner=entry.profileId,idx=owner?profileAssignments.get(owner):null,physical=Number.isInteger(idx)?v37PhysicalPads().find(g=>g.index===idx):null;
+ return physical?[physical]:[];
+};
+
+/* Unassigned controllers may only start the user picker while Controller mode
+   is active. This stops a controller from stealing a Mobile/PC session. */
+const v38RequestUserBase=v29RequestUser;
+v29RequestUser=function(index,opt={}){if(v38InputMode()!=='controller')return;return v38RequestUserBase(index,opt)};
+
+function v38StartNonController(mode){
+ if(!v38GateVisible())return;
+ if(!v38InputMode())v38SetInputMode(mode,{persist:true});
+ /* A stored mode stays authoritative until Settings changes it. */
+ v19DebugWithoutController=true;v19HideControllerGate();requestEntryFullscreen?.();showUserSelector(null);v37SyncMobileControls(true);
+}
+function v38StartController(gp){
+ if(!gp||!v38GateVisible())return;
+ if(!v38InputMode())v38SetInputMode('controller',{persist:true});
+ if(v38InputMode()!=='controller')return;
+ v19DebugWithoutController=false;v19HideControllerGate();controllerRuntime(gp);v29KnownPads.set(gp.index,gp);v29PickerDismissed.delete(gp.index);v29Prime(gp.index);v38RequestUserBase(gp.index,{force:true});
+}
+function v38PadIntent(gp){
+ const b=Array.from(gp?.buttons||[],x=>!!x&&(x.pressed||Number(x.value||0)>.45)),axes=Array.from(gp?.axes||[],Number),prev=v38GatePadState.get(gp.index)||{b:[],axes:[]};
+ const edge=b.some((v,i)=>v&&!prev.b[i]);const axis=axes.some((v,i)=>Math.abs(v)>.67&&Math.abs(prev.axes[i]||0)<=.52);
+ v38GatePadState.set(gp.index,{b:[...b],axes:[...axes]});return edge||axis;
+}
+
+/* Initial login always presents one neutral input gate. Connected controllers
+   are remembered but do not auto-open Pick User until the player actually uses
+   one. This is what lets first real input decide Mobile / PC / Controller. */
+initialControllerLoginSequence=function(){
+ v19Ready=true;pendingControllerLogins.splice(0);selectingControllerIndex=null;S.userSelectOpen=false;hideUi('#userSelect','back');
+ for(const gp of v37PhysicalPads()){v29KnownPads.set(gp.index,gp);controllerRuntime(gp);v29Prime(gp.index);v38GatePadState.set(gp.index,{b:v29Buttons(gp),axes:Array.from(gp.axes||[],Number)})}
+ v19ShowControllerGate();v38UpdateGateCopy();v37SyncMobileControls(true);
+};
+
+/* A connection alone does not choose Controller mode at the startup gate.
+   Once logged in, retain v0.29's strict new-controller ownership behavior. */
+const v38GamepadConnectedBase=v18GamepadConnected;
+v18GamepadConnected=function(e){
+ const gp=e?.gamepad;if(!gp)return;
+ if(v38GateVisible()){v29KnownPads.set(gp.index,gp);controllerRuntime(gp);v29Prime(gp.index);v38GatePadState.set(gp.index,{b:v29Buttons(gp),axes:Array.from(gp.axes||[],Number)});v38UpdateGateCopy();return}
+ return v38GamepadConnectedBase(e);
+};
+
+/* Disable the old "controller exists = immediately claim it" gate watcher. */
+try{v20ControllerGateWatch=function(){}}catch{}
+
+/* The controller scheduler is dormant in PC/Mobile mode. At the startup gate
+   it only watches for a REAL controller button/stick action. */
+const v38ControllerFrameBase=v24ControllerFrame;
+v24ControllerFrame=function(now){
+ const pads=v37PhysicalPads();
+ if(v38GateVisible()){
+  for(const gp of pads){
+   if(!v29KnownPads.has(gp.index)){v29KnownPads.set(gp.index,gp);controllerRuntime(gp);v38GatePadState.set(gp.index,{b:[],axes:[]})}
+   if(v38PadIntent(gp)){v38StartController(gp);break}
+  }
+  try{updateSessionStatus()}catch{};return;
+ }
+ if(v38InputMode()!=='controller'){
+  /* Keep live pad snapshots neutral so switching to Controller mode later starts
+     with a clean edge instead of replaying an old held button. */
+  for(const gp of pads){v29KnownPads.set(gp.index,gp);const r=controllerRuntime(gp);r.last=v29Buttons(gp)}
+  try{updateSessionStatus()}catch{};return;
+ }
+ return v38ControllerFrameBase(now);
+};
+
+/* Startup gate: touch chooses Mobile, mouse/pen chooses PC. A stored mode does
+   not get silently changed by another device; Settings is authoritative. */
+document.addEventListener('pointerdown',ev=>{
+ if(!v38GateVisible())return;
+ const detected=ev.pointerType==='touch'?'mobile':'pc';
+ if(!v38InputMode())v38SetInputMode(detected,{persist:true});
+ if(v38InputMode()==='controller')return;
+ ev.preventDefault();v38StartNonController(v38InputMode()||detected);
+},{capture:true});
+document.addEventListener('keydown',ev=>{
+ if(!v38GateVisible()||ev.metaKey||ev.ctrlKey||ev.altKey)return;
+ if(!v38InputMode())v38SetInputMode('pc',{persist:true});
+ if(v38InputMode()!=='controller'){ev.preventDefault();v38StartNonController(v38InputMode()||'pc')}
+},{capture:true});
+
+/* Larger system buttons also get explicit click fallbacks. Pointer handling is
+   still primary, but these make taps resilient on browsers that synthesize a
+   click after an interrupted pointer capture. */
+for(const el of document.querySelectorAll('#mobileControls [data-mc-system]')){
+ el.addEventListener('click',ev=>{ev.preventDefault();ev.stopPropagation()});
+}
+
+function v38InputModeItems(){
+ const current=v38InputMode()||'pc';
+ const pick=mode=>()=>{v38SetInputMode(mode,{persist:true,announce:true});v38RefreshInputModePage()};
+ return [
+  {title:'Mobile Touch',note:current==='mobile'?'Current · touch controller shown':'Use the on-screen controller',action:pick('mobile')},
+  {title:'PC Keyboard & Mouse',note:current==='pc'?'Current':'Hide touch controls; use keyboard and mouse',action:pick('pc')},
+  {title:'Controller',note:current==='controller'?'Current':'Use assigned physical controllers',action:pick('controller')},
+  {title:'How automatic detection works',note:'First unconfigured startup: touch = Mobile · keyboard/mouse = PC · gamepad input = Controller',disabled:true}
+ ];
+}
+function v38RefreshInputModePage(){if(document.querySelector('#pageTitle')?.textContent!=='Input Mode')return;S.pageItems=v38InputModeItems();S.pageIndex=Math.min(S.pageIndex,S.pageItems.length-1);renderPage()}
+function openInputModePage(){openPage({title:'Input Mode',subtitle:'DorukStation keeps this mode until you change it here.',icon:'assets/skin/flow/function/setting.png',items:v38InputModeItems()},true)}
+
+/* Mobile-controls page no longer has an Auto/On/Off toggle that can disagree
+   with Input Mode. Input Mode is the single source of truth. */
+v37MobileSettingItems=function(){
+ const p=v37MobilePrefs(),visLabel={both:'Home + Games',home:'Home only',games:'Games only'}[p.visibility];
+ return [
+  {title:'Input Mode',note:v38InputModeLabel(),action:openInputModePage},
+  {title:'Show Controls',note:visLabel,action:()=>{p.visibility=p.visibility==='both'?'home':p.visibility==='home'?'games':'both';v37SaveMobilePrefs(p);v37RefreshMobileSettings()}},
+  {title:'Style',note:`Follows ${typeof v26UiMode==='function'?v26UiModeLabel():'Classic'} UI`,disabled:true},
+  {title:'Button Size',note:p.size[0].toUpperCase()+p.size.slice(1),action:()=>{p.size=p.size==='small'?'medium':p.size==='medium'?'large':'small';v37SaveMobilePrefs(p);v37RefreshMobileSettings()}},
+  {title:'Opacity',note:`${Math.round(p.opacity*100)}%`,action:()=>{p.opacity=p.opacity<.6?.74:p.opacity<.82?.9:.52;v37SaveMobilePrefs(p);v37RefreshMobileSettings()}},
+  {title:'Stick Sensitivity',note:`${p.sensitivity.toFixed(2)}×`,action:()=>{p.sensitivity=p.sensitivity<.9?1:p.sensitivity<1.15?1.25:.8;v37SaveMobilePrefs(p);v37RefreshMobileSettings()}},
+  {title:'Touch Vibration',note:p.haptics?'On':'Off',action:()=>{p.haptics=!p.haptics;v37SaveMobilePrefs(p);v37RefreshMobileSettings()}},
+  {title:'Visibility rule',note:'Touch controller is shown only while Input Mode is Mobile',disabled:true}
+ ];
+};
+openMobileControlsPage=function(){openPage({title:'Mobile Controls',subtitle:'Layout and feel of the touch controller. Input Mode must be Mobile.',icon:'assets/skin/flow/function/setting.png',items:v37MobileSettingItems()},true)};
+
+const v38OpenSettingsBase=openSettingsPage;
+openSettingsPage=function(){
+ v38OpenSettingsBase();if(!S.pageOpen||document.querySelector('#pageTitle')?.textContent!=='Settings')return;
+ if(!S.pageItems.some(x=>x.title==='Input Mode')){
+  const ui=S.pageItems.findIndex(x=>x.title==='UI Mode'),at=ui>=0?ui+1:0;
+  S.pageItems.splice(at,0,{title:'Input Mode',icon:'⌨',note:v38InputModeLabel(),action:openInputModePage});
+ }
+ const mobile=S.pageItems.find(x=>x.title==='Mobile Controls');if(mobile)mobile.note=v38InputMode()==='mobile'?'Active':'Available in Mobile mode';
+ renderPage();
+};
+
+/* When a Settings change leaves Controller mode, release all virtual/system
+   input immediately. When it enters Mobile mode, reveal the overlay at once. */
+const v38LoadProfileBase=loadProfileState;
+loadProfileState=function(profile){const out=v38LoadProfileBase(profile);setTimeout(()=>{v38UpdateGateCopy();v37SyncMobileControls(true)},0);return out};
+
+v38UpdateGateCopy();v37SyncMobileControls(true);
+
+const v38UpdateDebugBase=updateDebug;
+updateDebug=function(...args){const out=v38UpdateDebugBase(...args),d=document.querySelector('#debug');if(d&&!d.classList.contains('hidden')){d.textContent=d.textContent.replace(/^v0\.\d+/m,'v0.38');d.textContent+=`\ninputMode=${v38InputModeLabel()} touchOverlay=${v37ShouldShow()?'visible':'hidden'}`}return out};
+
+
+/* ========================================================================== */
+/* DorukStation Web v0.39 — pre-login privacy + wireless system settings      */
+/* ========================================================================== */
+window.__dorukstationVersion='0.39';
+
+/* The input gate must be the first interactive surface. Never expose account
+   cards or the installed-app row underneath it, even for a single frame. */
+for(const sel of ['#userSelect','#createUserChoice','#createUserView','#avatarPicker']){
+ const el=document.querySelector(sel);if(el)el.classList.add('hidden');
+}
+S.userSelectOpen=false;S.createChoiceOpen=false;S.createUserOpen=false;
+
+/* Before a user is selected there is no per-user UI mode yet. Reuse the last
+   chosen global UI mode so the neutral gate looks like the shell the owner last
+   used: Classic blue Flow or Modern dark/glitter. */
+function v39ApplyPreloginUiMode(){
+ try{
+  const last=localStorage.getItem(V26_LAST_UI_MODE_KEY)||'classic';
+  S.uiMode=last==='modern'?'modern':'classic';
+  v26ApplyUiModeClass?.();
+ }catch{}
+}
+v39ApplyPreloginUiMode();
+
+/* Keep Home/apps completely private behind the input gate while preserving the
+   real Flow/Modern background layers. */
+const v39ShowGateBase=v19ShowControllerGate;
+v19ShowControllerGate=function(){
+ v39ApplyPreloginUiMode();document.body.classList.add('input-gate-open');
+ const out=v39ShowGateBase();v39UpdateGateCopy();return out;
+};
+const v39HideGateBase=v19HideControllerGate;
+v19HideControllerGate=function(){
+ const out=v39HideGateBase();
+ setTimeout(()=>document.body.classList.remove('input-gate-open'),UI_EXIT_MS+30);
+ return out;
+};
+
+function v39UpdateGateCopy(){
+ const gate=document.querySelector('#controllerGate');if(!gate)return;
+ gate.classList.add('v39-input-gate');
+ const title=gate.querySelector('h1'),hint=document.querySelector('#inputDetectHint'),status=document.querySelector('#inputModeGateStatus'),mode=v38InputMode();
+ if(title)title.textContent='Press any button or click/tap anywhere';
+ if(hint)hint.textContent=mode
+   ?`Input Mode: ${v38InputModeLabel(mode)}`
+   :'Touch = Mobile · Keyboard / Mouse = PC · Controller = Controller';
+ if(status)status.textContent=mode
+   ?'Your saved Input Mode stays active. Change it later in Settings → Input Mode.'
+   :'User selection appears only after DorukStation receives your first input.';
+}
+const v39GateCopyBase=v38UpdateGateCopy;
+v38UpdateGateCopy=function(){try{v39GateCopyBase()}catch{};v39UpdateGateCopy()};
+
+/* -------------------------------------------------------------------------- */
+/* Native-system bridge                                                       */
+/* -------------------------------------------------------------------------- */
+/* A normal HTTPS web page cannot enumerate SSIDs, toggle Wi-Fi, or control
+   system Bluetooth. DorukStation therefore supports a same-origin native bridge
+   when launched through serve.sh / DorukStation OS. GitHub Pages stays safe and
+   falls back to browser-visible status + Web Bluetooth LE pairing when offered. */
+function v39LocalSystemHost(){return ['127.0.0.1','localhost','::1'].includes(location.hostname)}
+async function v39SystemCall(action,payload={}){
+ if(window.DorukStationSystem&&typeof window.DorukStationSystem.call==='function'){
+  const r=await window.DorukStationSystem.call(action,payload);return r||{};
+ }
+ if(!v39LocalSystemHost())throw new Error('native-bridge-unavailable');
+ const r=await fetch(`/__dorukstation/api/${action}`,{
+  method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload||{}),cache:'no-store'
+ });
+ let data={};try{data=await r.json()}catch{}
+ if(!r.ok||data.ok===false)throw new Error(data.error||`system-api-${r.status}`);
+ return data;
+}
+async function v39SystemStatus(){
+ try{return await v39SystemCall('status')}catch{return {ok:false,bridge:false,wifi:{available:false},bluetooth:{available:false}}}
+}
+function v39SetPageItemsIf(title,items,subtitle){
+ if(document.querySelector('#pageTitle')?.textContent!==title)return;
+ S.pageItems=items;S.pageIndex=Math.max(0,Math.min(S.pageIndex,Math.max(0,items.length-1)));
+ if(subtitle!==undefined){const el=document.querySelector('#pageSubtitle');if(el)el.textContent=subtitle||''}
+ renderPage();
+}
+function v39Notify(title,text=''){
+ try{pushSystemNotification('',title,text,currentProfile)}catch{console.log(title,text)}
+}
+
+/* ---- Wi-Fi --------------------------------------------------------------- */
+async function v39RefreshWifiPage(){
+ const st=await v39SystemStatus(),w=st.wifi||{};
+ if(!st.bridge||!w.available){
+  v39SetPageItemsIf('Wi-Fi',[
+   {title:'Internet Status',note:navigator.onLine?'Online':'Offline',disabled:true},
+   {title:'Wi-Fi System Control',note:'Available when DorukStation runs through its local system bridge',disabled:true},
+   {title:'GitHub Pages / normal browser',note:'Browsers are not allowed to read SSIDs, passwords, or toggle operating-system Wi-Fi',disabled:true},
+   {title:'DorukStation OS',note:'Run ./serve.sh on Linux to enable NetworkManager controls here',disabled:true}
+  ],'Browser-safe network status. Full Wi-Fi control activates automatically in DorukStation OS/local mode.');
+  return;
+ }
+ const on=!!w.powered,connected=w.connection||'Not connected';
+ v39SetPageItemsIf('Wi-Fi',[
+  {title:'Wi-Fi',note:on?'On':'Off',action:async()=>{try{await v39SystemCall('wifi/power',{enabled:!on});v39Notify('Wi-Fi',!on?'Turned on':'Turned off');await v39RefreshWifiPage()}catch(e){v39Notify('Wi-Fi change failed',e.message)}}},
+  {title:'Connection',note:connected,disabled:true},
+  {title:'Signal',note:w.signal?`${w.signal}%`:'—',disabled:true},
+  {title:'Available Networks',note:'Scan and connect',action:v39OpenWifiNetworksPage},
+  {title:'Disconnect',note:w.connection?'Disconnect current Wi-Fi':'No active Wi-Fi',disabled:!w.connection,action:async()=>{try{await v39SystemCall('wifi/disconnect');v39Notify('Wi-Fi disconnected');await v39RefreshWifiPage()}catch(e){v39Notify('Disconnect failed',e.message)}}},
+  {title:'Refresh',action:v39RefreshWifiPage}
+ ],'Wi-Fi settings are provided by the DorukStation system bridge.');
+}
+function v39OpenWifiPage(){
+ openPage({title:'Wi-Fi',subtitle:'Checking Wi-Fi…',icon:'assets/skin/flow/function/setting.png',items:[{title:'Checking system network…',disabled:true}]},true);
+ v39RefreshWifiPage();
+}
+async function v39OpenWifiNetworksPage(){
+ openPage({title:'Available Networks',subtitle:'Scanning Wi-Fi…',items:[{title:'Scanning…',disabled:true}]},true);
+ try{
+  const data=await v39SystemCall('wifi/scan'),nets=Array.isArray(data.networks)?data.networks:[];
+  const unique=[];const seen=new Set();for(const n of nets){const key=n.ssid||'';if(!key||seen.has(key))continue;seen.add(key);unique.push(n)}
+  const items=unique.map(n=>({
+   title:n.ssid,note:`${n.signal||0}%${n.security&&n.security!=='--'?` · ${n.security}`:' · Open'}${n.active?' · Connected':''}`,
+   action:n.active?undefined:async()=>{
+    let password='';if(n.security&&n.security!=='--'&&n.security!=='OPEN')password=prompt(`Password for ${n.ssid}`,'')||'';
+    try{v39Notify('Wi-Fi',`Connecting to ${n.ssid}…`);await v39SystemCall('wifi/connect',{ssid:n.ssid,password});v39Notify('Wi-Fi connected',n.ssid);backPage();setTimeout(v39RefreshWifiPage,120)}catch(e){v39Notify('Wi-Fi connection failed',e.message)}
+   },disabled:!!n.active
+  }));
+  items.push({title:'Rescan',action:()=>{backPage();setTimeout(v39OpenWifiNetworksPage,80)}});
+  v39SetPageItemsIf('Available Networks',items.length?items:[{title:'No Wi-Fi networks found',disabled:true}],'Select a network to connect.');
+ }catch(e){v39SetPageItemsIf('Available Networks',[{title:'Wi-Fi scan unavailable',note:e.message,disabled:true}], 'The native system bridge could not scan Wi-Fi.');}
+}
+
+/* ---- Bluetooth ----------------------------------------------------------- */
+async function v39RefreshBluetoothPage(){
+ const st=await v39SystemStatus(),b=st.bluetooth||{};
+ if(!st.bridge||!b.available){
+  const items=[
+   {title:'Bluetooth System Control',note:'Available in DorukStation OS/local system mode',disabled:true}
+  ];
+  if(navigator.bluetooth?.requestDevice)items.push({title:'Pair Bluetooth LE Device',note:'Browser Web Bluetooth fallback',action:v39WebBluetoothPair});
+  items.push({title:'Browser limitation',note:'Web Bluetooth can pair supported BLE/GATT devices but cannot replace full OS Bluetooth settings',disabled:true});
+  v39SetPageItemsIf('Bluetooth',items,'Full Bluetooth control activates automatically when the DorukStation system bridge is available.');
+  return;
+ }
+ const on=!!b.powered;
+ v39SetPageItemsIf('Bluetooth',[
+  {title:'Bluetooth',note:on?'On':'Off',action:async()=>{try{await v39SystemCall('bluetooth/power',{enabled:!on});v39Notify('Bluetooth',!on?'Turned on':'Turned off');await v39RefreshBluetoothPage()}catch(e){v39Notify('Bluetooth change failed',e.message)}}},
+  {title:'Pair New Device',note:on?'Scan nearby devices':'Turn Bluetooth on first',disabled:!on,action:v39OpenBluetoothScanPage},
+  {title:'Paired Devices',note:String(b.pairedCount??0),action:v39OpenPairedBluetoothPage},
+  {title:'Refresh',action:v39RefreshBluetoothPage}
+ ],'Bluetooth settings are provided by the DorukStation system bridge.');
+}
+function v39OpenBluetoothPage(){openPage({title:'Bluetooth',subtitle:'Checking Bluetooth…',items:[{title:'Checking system Bluetooth…',disabled:true}]},true);v39RefreshBluetoothPage()}
+async function v39WebBluetoothPair(){
+ try{const d=await navigator.bluetooth.requestDevice({acceptAllDevices:true,optionalServices:[]});v39Notify('Bluetooth LE device selected',d.name||d.id||'Device')}catch(e){if(e?.name!=='NotFoundError')v39Notify('Bluetooth pairing failed',e.message||String(e))}
+}
+async function v39OpenBluetoothScanPage(){
+ openPage({title:'Bluetooth Devices',subtitle:'Scanning nearby devices…',items:[{title:'Scanning…',disabled:true}]},true);
+ try{
+  const data=await v39SystemCall('bluetooth/scan'),devices=Array.isArray(data.devices)?data.devices:[];
+  const items=devices.map(d=>({title:d.name||d.mac,note:`${d.mac}${d.paired?' · Paired':''}${d.connected?' · Connected':''}`,action:async()=>{
+   try{v39Notify('Bluetooth',`Pairing ${d.name||d.mac}…`);await v39SystemCall('bluetooth/pair',{mac:d.mac});v39Notify('Bluetooth paired',d.name||d.mac);backPage();setTimeout(v39RefreshBluetoothPage,100)}catch(e){v39Notify('Bluetooth pairing failed',e.message)}
+  }}));
+  items.push({title:'Scan Again',action:()=>{backPage();setTimeout(v39OpenBluetoothScanPage,80)}});
+  v39SetPageItemsIf('Bluetooth Devices',items.length?items:[{title:'No Bluetooth devices found',disabled:true}],'Choose a device to pair. Some devices may require confirmation on the device itself.');
+ }catch(e){v39SetPageItemsIf('Bluetooth Devices',[{title:'Bluetooth scan unavailable',note:e.message,disabled:true}]);}
+}
+async function v39OpenPairedBluetoothPage(){
+ openPage({title:'Paired Bluetooth Devices',subtitle:'Loading paired devices…',items:[{title:'Loading…',disabled:true}]},true);
+ try{
+  const data=await v39SystemCall('bluetooth/devices',{paired:true}),devices=Array.isArray(data.devices)?data.devices:[];
+  const items=devices.map(d=>({title:d.name||d.mac,note:`${d.mac}${d.connected?' · Connected':' · Paired'}`,action:async()=>{
+   try{await v39SystemCall(d.connected?'bluetooth/disconnect':'bluetooth/connect',{mac:d.mac});v39Notify('Bluetooth',d.connected?'Disconnected':'Connected');v39OpenPairedBluetoothPage()}catch(e){v39Notify('Bluetooth action failed',e.message)}
+  }}));
+  v39SetPageItemsIf('Paired Bluetooth Devices',items.length?items:[{title:'No paired Bluetooth devices',disabled:true}]);
+ }catch(e){v39SetPageItemsIf('Paired Bluetooth Devices',[{title:'Paired devices unavailable',note:e.message,disabled:true}]);}
+}
+function v39OpenDevicesPage(){openPage({title:'Devices',subtitle:'Controllers and Bluetooth devices.',items:[{title:'Controller',note:'Input mappings and assignments',action:openControllerPage},{title:'Bluetooth',note:'Power, pair and connect devices',action:v39OpenBluetoothPage}]},true)}
+
+/* Upgrade the Settings entries without disturbing the existing settings tree. */
+const v39OpenSettingsBase=openSettingsPage;
+openSettingsPage=function(){
+ v39OpenSettingsBase();if(!S.pageOpen||document.querySelector('#pageTitle')?.textContent!=='Settings')return;
+ const net=S.pageItems.find(x=>x.title==='Network');if(net){net.note=navigator.onLine?'Online · Wi-Fi settings':'Offline · Wi-Fi settings';net.action=v39OpenWifiPage}
+ const dev=S.pageItems.find(x=>x.title==='Devices');if(dev){dev.note='Controllers · Bluetooth';dev.action=v39OpenDevicesPage}
+ renderPage();
+};
+
+/* Keep the gate copy and pre-login mode correct after profile changes/restarts. */
+const v39LoadProfileBase=loadProfileState;
+loadProfileState=function(profile){const out=v39LoadProfileBase(profile);setTimeout(()=>{v39UpdateGateCopy();v37SyncMobileControls(true)},0);return out};
+v39UpdateGateCopy();
+
+const v39UpdateDebugBase=updateDebug;
+updateDebug=function(...args){const out=v39UpdateDebugBase(...args),d=document.querySelector('#debug');if(d&&!d.classList.contains('hidden')){d.textContent=d.textContent.replace(/^v0\.\d+/m,'v0.39');d.textContent+=`\nsystemBridge=${v39LocalSystemHost()?'local-capable':'browser-only'}`}return out};

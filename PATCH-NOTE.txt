@@ -1,0 +1,15 @@
+DorukStation Web v0.39 patch
+============================
+Apply this on top of the complete v0.38 (or v0.36 + later patches) folder.
+
+Changes:
+- Input gate is guaranteed to appear before user cards or installed-app content.
+- Gate keeps the real Classic blue or last-used Modern dark/glitter background.
+- User selection appears only after input is received.
+- Settings → Network controls Wi-Fi when using the local Linux system bridge.
+- Settings → Devices → Bluetooth can power, scan, pair and connect when using the bridge.
+- GitHub Pages/browser mode keeps safe fallbacks; websites cannot directly control OS Wi-Fi/full Bluetooth.
+- ./serve.sh launches the local bridge/static server on 127.0.0.1:8765.
+
+For GitHub Pages, commit the patch normally. The system-bridge files are harmless
+static files there; they only run when you explicitly execute ./serve.sh locally.

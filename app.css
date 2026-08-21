@@ -444,3 +444,144 @@ body.ui-modern.game-banner-active #flowColor{opacity:.18}
 body.ui-modern.game-banner-active #photoBackground{opacity:0!important}
 body.ui-modern.game-banner-active #backgroundShade{background:linear-gradient(90deg,rgba(0,0,0,.58) 0%,rgba(0,0,0,.27) 43%,rgba(0,0,0,.10) 72%,rgba(0,0,0,.28) 100%),linear-gradient(180deg,rgba(0,0,0,.08),rgba(0,0,0,.12) 55%,rgba(0,0,0,.55))}
 body.ui-modern.no-animation .modern-game-banner{transition:opacity .16s ease!important;transform:none!important}
+
+
+/* ========================================================================== */
+/* v0.37 — Mobile / touch virtual controller                                  */
+/* ========================================================================== */
+.mobile-controls{
+ --mc-scale:1;
+ --mc-opacity:.74;
+ position:fixed;inset:0;z-index:1500;pointer-events:none;touch-action:none;
+ font-family:Arial,Helvetica,sans-serif;color:#fff;user-select:none;-webkit-user-select:none;
+ -webkit-tap-highlight-color:transparent;
+}
+.mobile-controls.hidden{display:none!important}
+.mobile-controls button,.mobile-controls .mc-stick{pointer-events:auto;touch-action:none;-webkit-touch-callout:none}
+.mobile-controls .mc-button{
+ position:absolute;margin:0;padding:0;border:2px solid rgba(255,255,255,.9);color:#fff;
+ background:rgba(4,39,103,.30);box-shadow:0 2px 9px rgba(0,0,0,.38),inset 0 0 12px rgba(255,255,255,.08);
+ opacity:var(--mc-opacity);display:grid;place-items:center;font:700 16px/1 Arial,Helvetica,sans-serif;
+ backdrop-filter:blur(2px);-webkit-backdrop-filter:blur(2px);outline:none;
+}
+.mobile-controls .mc-button.mc-active,.mobile-controls .mc-button:active{
+ opacity:1;background:rgba(105,174,255,.48);box-shadow:0 0 0 3px rgba(255,255,255,.15),0 0 18px rgba(111,184,255,.55),inset 0 0 14px rgba(255,255,255,.22)
+}
+.mc-shoulder{top:max(12px,env(safe-area-inset-top));width:62px;height:52px;border-radius:13px 13px 22px 22px!important}
+.mc-l2{left:max(14px,env(safe-area-inset-left))}.mc-l1{left:94px;top:72px}
+.mc-r2{right:max(14px,env(safe-area-inset-right))}.mc-r1{right:94px;top:72px}
+
+.mc-dpad{position:absolute;left:max(24px,env(safe-area-inset-left));top:37%;width:155px;height:155px;transform:translateY(-50%) scale(var(--mc-scale));transform-origin:left center;pointer-events:none}
+.mc-dpad .mc-button{width:55px;height:55px;border-radius:12px;font-size:20px}
+.mc-dpad-up{left:50px;top:0}.mc-dpad-down{left:50px;bottom:0}.mc-dpad-left{left:0;top:50px}.mc-dpad-right{right:0;top:50px}
+.mc-dpad-center{position:absolute;left:50px;top:50px;width:55px;height:55px;background:rgba(4,39,103,.20);border:2px solid rgba(255,255,255,.42);box-sizing:border-box;opacity:var(--mc-opacity);border-radius:10px}
+
+.mc-stick{position:absolute;width:142px;height:142px;border-radius:50%;transform:scale(var(--mc-scale));pointer-events:auto;opacity:var(--mc-opacity)}
+.mc-left-stick{left:max(102px,calc(env(safe-area-inset-left) + 102px));bottom:max(28px,calc(env(safe-area-inset-bottom) + 28px));transform-origin:left bottom}
+.mc-right-stick{right:max(102px,calc(env(safe-area-inset-right) + 102px));bottom:max(28px,calc(env(safe-area-inset-bottom) + 28px));transform-origin:right bottom}
+.mc-stick-ring{position:absolute;inset:0;border-radius:50%;border:2px solid rgba(255,255,255,.9);background:radial-gradient(circle at 38% 34%,rgba(255,255,255,.18),rgba(35,95,185,.28) 45%,rgba(0,15,55,.30));box-shadow:0 3px 11px rgba(0,0,0,.42),inset 0 0 20px rgba(255,255,255,.10)}
+.mc-stick-knob{position:absolute;width:78px;height:78px;left:32px;top:32px;border-radius:50%;border:2px solid rgba(255,255,255,.66);background:radial-gradient(circle at 38% 32%,rgba(255,255,255,.28),rgba(69,127,214,.40) 52%,rgba(6,24,65,.52));box-shadow:0 3px 10px rgba(0,0,0,.48);transform:translate3d(0,0,0);will-change:transform}
+
+.mc-face{position:absolute;right:max(22px,env(safe-area-inset-right));top:39%;width:160px;height:160px;transform:translateY(-50%) scale(var(--mc-scale));transform-origin:right center;pointer-events:none}
+.mc-face .mc-button{width:56px;height:56px;border-radius:50%;font-size:35px;font-weight:400}
+.mc-triangle{left:52px;top:0}.mc-square{left:0;top:52px}.mc-circle{right:0;top:52px}.mc-cross{left:52px;bottom:0}
+
+.mc-center-buttons{position:absolute;left:50%;bottom:max(18px,calc(env(safe-area-inset-bottom) + 18px));transform:translateX(-50%) scale(var(--mc-scale));transform-origin:center bottom;display:flex;gap:12px;align-items:center;pointer-events:none}
+.mc-center-buttons .mc-button{position:relative!important;inset:auto!important}
+.mc-small{width:76px;height:34px;border-radius:16px!important;font-size:10px!important;letter-spacing:.04em}
+.mc-home{width:52px;height:38px;border-radius:9px!important;font-size:19px!important;font-weight:800!important}
+
+.mobile-rotate-hint{display:none;position:absolute;left:50%;top:max(10px,env(safe-area-inset-top));transform:translateX(-50%);padding:8px 14px;border-radius:18px;background:rgba(0,0,0,.66);border:1px solid rgba(255,255,255,.28);font-size:13px;letter-spacing:.01em;opacity:.92;backdrop-filter:blur(10px)}
+
+/* Modern follows the user's second sketch: dark glass, thinner white outlines. */
+body.ui-modern .mobile-controls .mc-button{background:rgba(12,14,20,.38);border-color:rgba(255,255,255,.78);box-shadow:0 3px 16px rgba(0,0,0,.40),inset 0 0 9px rgba(255,255,255,.045);backdrop-filter:blur(7px);-webkit-backdrop-filter:blur(7px)}
+body.ui-modern .mobile-controls .mc-button.mc-active,body.ui-modern .mobile-controls .mc-button:active{background:rgba(255,255,255,.20);border-color:#fff;box-shadow:0 0 0 3px rgba(255,255,255,.11),0 6px 18px rgba(0,0,0,.42)}
+body.ui-modern .mc-dpad-center{background:rgba(12,14,20,.28);border-color:rgba(255,255,255,.30)}
+body.ui-modern .mc-stick-ring{background:radial-gradient(circle at 38% 34%,rgba(255,255,255,.12),rgba(42,45,53,.31) 48%,rgba(3,4,7,.42));border-color:rgba(255,255,255,.78);backdrop-filter:blur(6px)}
+body.ui-modern .mc-stick-knob{background:radial-gradient(circle at 40% 32%,rgba(255,255,255,.22),rgba(81,84,94,.38) 54%,rgba(5,6,9,.58));border-color:rgba(255,255,255,.55)}
+
+body.mc-size-small .mobile-controls{--mc-scale:.82}
+body.mc-size-medium .mobile-controls{--mc-scale:1}
+body.mc-size-large .mobile-controls{--mc-scale:1.18}
+
+@media (orientation:portrait){
+ .mobile-controls .mobile-rotate-hint{display:block}
+ .mc-dpad{top:45%;transform:translateY(-50%) scale(calc(var(--mc-scale) * .82))}
+ .mc-face{top:45%;transform:translateY(-50%) scale(calc(var(--mc-scale) * .82))}
+ .mc-stick{bottom:max(85px,calc(env(safe-area-inset-bottom) + 85px))}
+ .mc-left-stick{left:max(20px,env(safe-area-inset-left))}.mc-right-stick{right:max(20px,env(safe-area-inset-right))}
+ .mc-center-buttons{bottom:max(20px,calc(env(safe-area-inset-bottom) + 20px))}
+ .mc-shoulder{transform:scale(.86)}
+ .mc-l1{left:70px}.mc-r1{right:70px}
+}
+@media (max-width:680px) and (orientation:landscape){
+ .mobile-controls{--mc-scale:.82}
+ .mc-left-stick{left:82px;bottom:15px}.mc-right-stick{right:82px;bottom:15px}
+ .mc-dpad{left:12px}.mc-face{right:12px}.mc-center-buttons{bottom:10px}
+ .mc-l1{left:74px;top:58px}.mc-r1{right:74px;top:58px}.mc-shoulder{width:54px;height:44px}
+}
+@media (prefers-reduced-motion:reduce){.mc-stick-knob{transition:none!important}}
+
+
+/* ========================================================================== */
+/* DorukStation Web v0.34 — visible animated Modern glitter                  */
+/* ========================================================================== */
+/* The old pseudo-element star texture moved too subtly and could look like
+   static dots. This dedicated particle layer visibly twinkles and drifts. */
+body.ui-modern #viewport::before,body.ui-modern #viewport::after{display:none!important}
+#modernGlitter{position:absolute;inset:-3%;z-index:6;pointer-events:none;display:none;overflow:hidden;opacity:.92;will-change:transform,opacity}
+body.ui-modern #modernGlitter{display:block;animation:v34GlitterDrift 18s ease-in-out infinite alternate}
+body.ui-modern.game-banner-active #modernGlitter{opacity:.58}
+#modernGlitter .v34-glitter{position:absolute;left:var(--x);top:var(--y);width:var(--s);height:var(--s);border-radius:50%;background:rgba(255,255,255,.98);box-shadow:0 0 calc(var(--s)*3.2) rgba(255,255,255,.78),0 0 calc(var(--s)*7) rgba(115,180,255,.30);opacity:.04;transform:scale(.22);animation:v34GlitterTwinkle var(--d) ease-in-out var(--delay) infinite;will-change:transform,opacity}
+#modernGlitter .v34-glitter.blue{background:rgba(151,207,255,.98);box-shadow:0 0 calc(var(--s)*3.4) rgba(126,195,255,.9),0 0 calc(var(--s)*8) rgba(58,132,255,.42)}
+#modernGlitter .v34-glitter.big{box-shadow:0 0 calc(var(--s)*4.2) rgba(255,255,255,.95),0 0 calc(var(--s)*10) rgba(135,193,255,.45)}
+@keyframes v34GlitterTwinkle{0%,100%{opacity:.025;transform:scale(.2) rotate(0deg)}22%{opacity:.22;transform:scale(.55) rotate(30deg)}46%{opacity:1;transform:scale(1.75) rotate(78deg)}58%{opacity:.34;transform:scale(.72) rotate(112deg)}76%{opacity:.08;transform:scale(.34) rotate(145deg)}}
+@keyframes v34GlitterDrift{0%{transform:translate3d(-.8%,-.5%,0) scale(1.01)}100%{transform:translate3d(.9%,.75%,0) scale(1.025)}}
+body.ui-modern.no-animation #modernGlitter,body.ui-modern.no-animation #modernGlitter .v34-glitter{animation:none!important}
+body.ui-modern.no-animation #modernGlitter .v34-glitter{opacity:.28;transform:scale(.7)}
+
+
+/* ========================================================================== */
+/* v0.38 — explicit Input Mode + larger mobile system controls                */
+/* ========================================================================== */
+#controllerGate.v38-input-detect{cursor:pointer}
+#controllerGate.v38-input-detect .controller-gate-panel{cursor:pointer}
+#controllerGate.v38-input-detect #playWithoutController{display:none!important}
+#inputModeGateStatus{max-width:680px;margin-left:auto;margin-right:auto;line-height:1.45}
+
+/* SHARE / DorukStation / OPTIONS are deliberately larger than v0.37. */
+.mc-center-buttons{gap:18px;z-index:8}
+.mc-center-buttons .mc-button{z-index:9;touch-action:none;-webkit-tap-highlight-color:transparent}
+.mc-small{width:118px;height:48px;border-radius:22px!important;font-size:12px!important;font-weight:800!important;letter-spacing:.055em}
+.mc-home{width:76px;height:58px;border-radius:15px!important;font-size:27px!important;font-weight:900!important}
+.mc-center-buttons .mc-button::after{content:"";position:absolute;inset:-9px;border-radius:inherit}
+
+@media (max-width:680px) and (orientation:landscape){
+ .mc-center-buttons{gap:12px;bottom:8px}
+ .mc-small{width:96px;height:43px;font-size:10px!important}
+ .mc-home{width:64px;height:50px;font-size:23px!important}
+}
+@media (orientation:portrait){
+ .mc-center-buttons{gap:10px}
+ .mc-small{width:100px;height:45px}
+ .mc-home{width:68px;height:52px}
+}
+
+
+/* ========================================================================== */
+/* v0.39 — private pre-login input gate                                       */
+/* ========================================================================== */
+/* Keep the real shell background, but never reveal the Home/app/user content
+   until an input class has been established. */
+body.input-gate-open #stage{opacity:0!important;visibility:hidden!important;pointer-events:none!important}
+body.input-gate-open #systemNotificationStack,body.input-gate-open #sessionStatus{display:none!important}
+#controllerGate.v39-input-gate{background:transparent;isolation:isolate;overflow:hidden}
+#controllerGate.v39-input-gate .controller-gate-panel{position:relative;z-index:2;border-radius:2px}
+body.ui-classic #controllerGate.v39-input-gate .controller-gate-panel{background:linear-gradient(145deg,rgba(2,66,154,.56),rgba(0,30,98,.42));border-color:rgba(255,255,255,.18);box-shadow:0 25px 90px rgba(0,20,80,.24)}
+body.ui-modern #controllerGate.v39-input-gate .controller-gate-panel{background:linear-gradient(145deg,rgba(18,22,31,.78),rgba(4,7,12,.68));border-color:rgba(255,255,255,.14);box-shadow:0 25px 90px rgba(0,0,0,.42);backdrop-filter:blur(18px) saturate(1.15)}
+body.ui-modern #controllerGate.v39-input-gate::before{content:"";position:absolute;inset:-8%;z-index:1;pointer-events:none;opacity:.62;background-image:radial-gradient(circle,rgba(255,255,255,.9) 0 1px,transparent 1.5px),radial-gradient(circle,rgba(126,193,255,.72) 0 1.2px,transparent 1.8px);background-size:79px 93px,151px 137px;background-position:12px 21px,53px 71px;animation:v39GateGlitter 13s ease-in-out infinite alternate;mix-blend-mode:screen}
+@keyframes v39GateGlitter{from{transform:translate3d(-.4%,-.6%,0);opacity:.42}to{transform:translate3d(.7%,.6%,0);opacity:.78}}
+body.ui-modern.no-animation #controllerGate.v39-input-gate::before{animation:none}
+#controllerGate.v39-input-gate .controller-gate-panel h1{font-size:clamp(32px,4vw,58px)}
+#controllerGate.v39-input-gate #inputDetectHint{margin-bottom:16px}
+#controllerGate.v39-input-gate #inputModeGateStatus{margin-top:10px}

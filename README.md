@@ -1,12 +1,27 @@
-# DorukStation Web v0.36
+# DorukStation Web v0.39
+
+## Mobile / touch controller
+
+- Adds a full-screen touch controller inspired by the supplied Classic and Modern mobile sketches.
+- Classic UI gets a blue translucent controller; Modern UI gets a dark glass controller.
+- Works in the DorukStation shell and is exposed to same-origin HTML games as a standard Gamepad in slot 0.
+- Supports true multitouch: both analog sticks plus held face/shoulder buttons at the same time.
+- Touch PS/Home: short press returns Home; hold 1 second opens Quick Menu. SHARE opens DorukStation Share.
+- Auto mode detects touch/coarse-pointer devices and hides the overlay when a real controller is connected.
+- Settings → Mobile Controls: Auto/On/Off, Home/Games visibility, size, opacity, sensitivity and vibration.
+- Portrait mode shows a rotate-device hint and rearranges/scales controls.
+- Carries forward the v0.36 game-audio fix: game media playback is no longer delayed by DorukStation's device-sink routing shim.
+- Keeps Dungeons music as normal `games/DungeonMusic/` files, making this package suitable for GitHub Pages and normal Git file limits.
+
+# DorukStation Web v0.35
 
 
-## v0.36 Flappy Bird game
+## v0.35 Flappy Bird game
 
 - Adds an original, self-contained Flappy Bird-style game to the built-in games folder.
 - Supports controller, keyboard/mouse, and mobile touch input.
 - Includes its own DorukStation tile icon, banner, sound effects, pause menu, and per-user high score.
-## v0.36 DorukCraft Dungeons audio fix
+## v0.35 DorukCraft Dungeons audio fix
 
 - Updates the bundled DorukCraft Dungeons game to v0.4.7.
 - Bundles the complete `DungeonMusic/` companion folder under `games/DungeonMusic/`.
@@ -326,3 +341,23 @@ Game pointer/keyboard/touch input is available immediately on launch/resume. Onl
 - Added a dedicated DorukCraft Dungeons Home icon.
 - Modern UI uses the supplied Dungeons 2560×1440 artwork while the game is focused.
 - DorukCraft also now has its supplied 2560×1440 focus background.
+
+
+## v0.38 — Input Mode detection
+- Startup gate now says **Press any button or click/tap anywhere**.
+- First unconfigured input chooses Mobile Touch, PC Keyboard & Mouse, or Controller.
+- Input Mode is remembered until changed under **Settings → Input Mode**.
+- Touch controls are visible **only** in Mobile Input Mode; touchscreen capability alone no longer enables them.
+- SHARE / DorukStation / OPTIONS touch buttons are larger.
+- Controller connection alone no longer hijacks the startup gate; the controller must actually send input.
+
+
+## v0.39 — Private input gate + Wi-Fi/Bluetooth settings
+
+- The startup input gate appears before any local user cards or installed-app tiles can be visible.
+- The gate uses the last selected Classic blue or Modern dark/glitter UI background.
+- User selection opens only after the startup input event is accepted.
+- Settings → Network now exposes Wi-Fi controls when DorukStation is running with its local Linux system bridge.
+- Settings → Devices now includes Bluetooth power/pair/connect controls through the same bridge.
+- Normal browsers/GitHub Pages keep safe browser-only fallbacks because websites cannot directly change operating-system Wi-Fi/Bluetooth settings.
+- `./serve.sh` now starts the optional local system bridge/static server on Linux.

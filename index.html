@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>DorukStation — UI Modes v0.36</title>
+<title>DorukStation — v0.39</title>
 <link rel="stylesheet" href="app.css">
 </head>
 <body>
@@ -17,6 +17,7 @@
   <div id="waveFar" class="wave"></div>
   <div id="waveMain" class="wave"></div>
   <div id="waveNear" class="wave"></div>
+  <div id="modernGlitter" aria-hidden="true"></div>
   <div id="backgroundShade"></div>
 
   <!-- Boot also lives at viewport level so it covers EVERY pixel, not just the UI canvas. -->
@@ -29,14 +30,14 @@
 
   <section id="controllerGate" class="hidden" aria-label="Connect a controller">
     <div class="controller-gate-panel">
-      <h1>Connect a controller to begin</h1>
-      <p>Connect a controller, then choose who is playing.</p>
-      <button id="playWithoutController" type="button">or play without one</button>
-      <small>Keyboard and mouse mode is intended for PC use and debugging.</small>
+      <h1>Press any button or click/tap anywhere</h1>
+      <p id="inputDetectHint">Touch → Mobile · Keyboard / Mouse → PC · Controller → Controller</p>
+      <button id="playWithoutController" class="hidden" type="button" aria-hidden="true">Continue</button>
+      <small id="inputModeGateStatus">DorukStation will remember the detected Input Mode until you change it in Settings.</small>
     </div>
   </section>
 
-  <section id="userSelect" aria-label="Choose DorukStation user">
+  <section id="userSelect" class="hidden" aria-label="Choose DorukStation user">
     <div class="user-select-panel">
       <h1 id="userSelectTitle">Select User</h1>
       <p id="userSelectSubtitle">Game saves, trophies and settings stay separate for every local user.</p>
@@ -183,6 +184,49 @@
        That gives every game the user's real available display resolution/aspect ratio. -->
   <section id="appSurface" class="hidden" aria-label="Running application">
     <div id="homeOverlayHint">PS / HOME → Home · Hold 1s → Quick Menu · SHARE → Share</div>
+  </section>
+
+
+
+  <!-- v0.39: mobile/touch virtual controller. The same controller is used by
+       Classic/Modern shell navigation and exposed to running HTML games as a
+       standard Gamepad when touch controls are active. -->
+  <section id="mobileControls" class="mobile-controls hidden" aria-label="DorukStation touch controller">
+    <div id="mobileRotateHint" class="mobile-rotate-hint">↻ Rotate device for best play</div>
+
+    <button class="mc-button mc-shoulder mc-l2" data-mc-button="6" type="button" aria-label="L2">L2</button>
+    <button class="mc-button mc-shoulder mc-l1" data-mc-button="4" type="button" aria-label="L1">L1</button>
+    <button class="mc-button mc-shoulder mc-r2" data-mc-button="7" type="button" aria-label="R2">R2</button>
+    <button class="mc-button mc-shoulder mc-r1" data-mc-button="5" type="button" aria-label="R1">R1</button>
+
+    <div class="mc-dpad" aria-label="Directional pad">
+      <button class="mc-button mc-dpad-up" data-mc-button="12" data-mc-dir="U" type="button" aria-label="Up">▲</button>
+      <button class="mc-button mc-dpad-left" data-mc-button="14" data-mc-dir="L" type="button" aria-label="Left">◀</button>
+      <div class="mc-dpad-center" aria-hidden="true"></div>
+      <button class="mc-button mc-dpad-right" data-mc-button="15" data-mc-dir="R" type="button" aria-label="Right">▶</button>
+      <button class="mc-button mc-dpad-down" data-mc-button="13" data-mc-dir="D" type="button" aria-label="Down">▼</button>
+    </div>
+
+    <div class="mc-stick mc-left-stick" data-mc-stick="left" role="group" aria-label="Left analog stick">
+      <div class="mc-stick-ring"><div class="mc-stick-knob"></div></div>
+    </div>
+
+    <div class="mc-face" aria-label="Face buttons">
+      <button class="mc-button mc-triangle" data-mc-button="3" type="button" aria-label="Triangle">△</button>
+      <button class="mc-button mc-square" data-mc-button="2" type="button" aria-label="Square">□</button>
+      <button class="mc-button mc-circle" data-mc-button="1" type="button" aria-label="Circle">○</button>
+      <button class="mc-button mc-cross" data-mc-button="0" type="button" aria-label="Cross">×</button>
+    </div>
+
+    <div class="mc-stick mc-right-stick" data-mc-stick="right" role="group" aria-label="Right analog stick">
+      <div class="mc-stick-ring"><div class="mc-stick-knob"></div></div>
+    </div>
+
+    <div class="mc-center-buttons" aria-label="System buttons">
+      <button class="mc-button mc-small" data-mc-button="8" data-mc-system="share" type="button">SHARE</button>
+      <button class="mc-button mc-home" data-mc-system="home" type="button" aria-label="DorukStation Home">D</button>
+      <button class="mc-button mc-small" data-mc-button="9" data-mc-system="options" type="button">OPTIONS</button>
+    </div>
   </section>
 
   <section id="quickMenuOverlay" class="shell-side-overlay hidden" aria-label="Quick Menu">
