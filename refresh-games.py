@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
 from pathlib import Path
-import json, re, hashlib, shutil
+import json, re, hashlib
 
 ROOT = Path(__file__).resolve().parent
 GAMES = ROOT / "games"
 PAYLOADS = GAMES / "payloads"
 BANNERS = GAMES / "banners"
+GAMES.mkdir(parents=True, exist_ok=True)
 PAYLOADS.mkdir(parents=True, exist_ok=True)
 BANNERS.mkdir(parents=True, exist_ok=True)
 
-# Remove old generated payload scripts so deleted games disappear cleanly.
 for p in PAYLOADS.glob("*.js"):
     p.unlink()
 
@@ -24,59 +24,82 @@ def extract_title(text: str, fallback: str) -> str:
     title = re.sub(r"\s+", " ", re.sub(r"<[^>]+>", "", m.group(1))).strip()
     return title or fallback
 
-def extract_icon(text: str, game_file: Path) -> str:
-    # A sidecar image beside the HTML overrides the webpage favicon. This lets a game
-    # keep a dedicated DorukStation Home tile without editing the game's own HTML.
-    # Example: games/DorukCraft.html + games/DorukCraft.png
-    for ext in (".png", ".webp", ".jpg", ".jpeg"):
-        sidecar = game_file.with_suffix(ext)
-        if sidecar.exists():
-            return (sidecar.relative_to(ROOT)).as_posix()
+def discover_games():
+    """Support both old games/Game.html and games/Game/index.html layouts."""
+    found = list(sorted(GAMES.glob("*.html"), key=lambda p: p.name.lower()))
+    reserved = {"payloads", "banners", "dungeonmusic"}
+    for folder in sorted((p for p in GAMES.iterdir() if p.is_dir()), key=lambda p: p.name.lower()):
+        if folder.name.lower() in reserved:
+            continue
+        index = folder / "index.html"
+        if index.exists():
+            found.append(index)
+            continue
+        htmls = sorted(folder.glob("*.html"), key=lambda p: p.name.lower())
+        if len(htmls) == 1:
+            found.append(htmls[0])
+    return found
 
-    # Otherwise prefer explicit favicon/apple-touch-icon. This supports self-contained
-    # data: icons, absolute URLs, and files that live beside the game's HTML.
+def extract_icon(text: str, game_file: Path) -> str:
+    # Structured game folders prefer conventional icon/cover files.
+    if game_file.parent != GAMES:
+        stems = ["icon", "cover", game_file.parent.name, game_file.stem]
+        for stem in stems:
+            for ext in (".png", ".webp", ".jpg", ".jpeg"):
+                sidecar = game_file.parent / f"{stem}{ext}"
+                if sidecar.exists():
+                    return sidecar.relative_to(ROOT).as_posix()
+    else:
+        for ext in (".png", ".webp", ".jpg", ".jpeg"):
+            sidecar = game_file.with_suffix(ext)
+            if sidecar.exists():
+                return sidecar.relative_to(ROOT).as_posix()
+
     links = re.findall(r"<link\b[^>]*>", text, re.I)
-    candidates = []
     for tag in links:
         rel = re.search(r"\brel\s*=\s*([\"'])(.*?)\1", tag, re.I | re.S)
         href = re.search(r"\bhref\s*=\s*([\"'])(.*?)\1", tag, re.I | re.S)
-        if not href:
+        if not href or "icon" not in ((rel.group(2).lower() if rel else "")):
             continue
-        relv = (rel.group(2).lower() if rel else "")
-        if "icon" in relv:
-            candidates.append(href.group(2).strip())
-    if not candidates:
-        return ""
-    icon = candidates[0]
-    if re.match(r"^(data:|https?:|blob:|//)", icon, re.I) or icon.startswith("/"):
-        return icon
-    # Resolve a relative favicon against its HTML file in games/.
-    rel = (game_file.parent.relative_to(ROOT) / icon).as_posix()
-    return rel
+        icon = href.group(2).strip()
+        if re.match(r"^(data:|https?:|blob:|//)", icon, re.I) or icon.startswith("/"):
+            return icon
+        return (game_file.parent.relative_to(ROOT) / icon).as_posix()
+    return ""
 
-def extract_banners(gid: str):
-    folder = BANNERS / gid
-    if not folder.exists():
-        return []
+def natural_key(p: Path):
+    return [int(x) if x.isdigit() else x for x in re.split(r"(\d+)", p.name.lower())]
+
+def extract_banners(gid: str, game_file: Path):
+    folders = []
+    if game_file.parent != GAMES:
+        folders.append(game_file.parent / "banners")
+    folders.append(BANNERS / gid)
     allowed = {".png", ".jpg", ".jpeg", ".webp"}
-    files = [p for p in folder.iterdir() if p.is_file() and p.suffix.lower() in allowed]
-    def natural_key(p):
-        parts = re.split(r"(\d+)", p.name.lower())
-        return [int(x) if x.isdigit() else x for x in parts]
-    files.sort(key=natural_key)
-    return [p.relative_to(ROOT).as_posix() for p in files]
+    out, seen = [], set()
+    for folder in folders:
+        if not folder.exists():
+            continue
+        for p in sorted((p for p in folder.iterdir() if p.is_file() and p.suffix.lower() in allowed), key=natural_key):
+            rel = p.relative_to(ROOT).as_posix()
+            if rel not in seen:
+                seen.add(rel); out.append(rel)
+    return out
 
-entries = []
-seen = set()
-for game in sorted(GAMES.glob("*.html"), key=lambda p: p.name.lower()):
+entries, seen = [], set()
+for game in discover_games():
     raw = game.read_text(encoding="utf-8", errors="replace")
-    base = game.stem
-    gid = "dorukcraft" if game.name.lower() == "dorukcraft.html" else slug(base)
+    structured = game.parent != GAMES
+    base = game.parent.name if structured else game.stem
+    if not structured and game.name.lower() == "dorukcraft.html":
+        gid = "dorukcraft"
+    else:
+        gid = slug(base)
     if gid in seen:
-        gid = f"{gid}-{hashlib.sha1(game.name.encode()).hexdigest()[:6]}"
+        relname = game.relative_to(GAMES).as_posix()
+        gid = f"{gid}-{hashlib.sha1(relname.encode()).hexdigest()[:6]}"
     seen.add(gid)
     name = extract_title(raw, base)
-    # Clean common version suffix from Home title only when it is obviously DorukCraft.
     if gid == "dorukcraft" and name.lower().startswith("dorukcraft"):
         display_name = "DorukCraft"
     elif gid.startswith("dorukcraft-dungeons") and name.lower().startswith("dorukcraft dungeons"):
@@ -84,22 +107,20 @@ for game in sorted(GAMES.glob("*.html"), key=lambda p: p.name.lower()):
     else:
         display_name = name
     icon = extract_icon(raw, game)
-    payload_name = f"{gid}.js"
-    payload_rel = f"games/payloads/{payload_name}"
-    # External JS avoids loading every game's huge HTML into app.js/index.html.
+    payload_rel = f"games/payloads/{gid}.js"
     payload_js = (
         "window.DorukStationGamePayloads=window.DorukStationGamePayloads||{};\n"
         f"window.DorukStationGamePayloads[{json.dumps(gid)}]={json.dumps(raw, ensure_ascii=False)};\n"
     )
-    (PAYLOADS / payload_name).write_text(payload_js, encoding="utf-8")
+    (PAYLOADS / f"{gid}.js").write_text(payload_js, encoding="utf-8")
     entries.append({
         "id": gid,
         "name": display_name,
         "title": name,
-        "file": f"games/{game.name}",
+        "file": game.relative_to(ROOT).as_posix(),
         "payload": payload_rel,
         "icon": icon,
-        "banners": extract_banners(gid),
+        "banners": extract_banners(gid, game),
         "size": game.stat().st_size,
         "sha256": hashlib.sha256(game.read_bytes()).hexdigest(),
     })

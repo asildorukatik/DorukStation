@@ -1,0 +1,15 @@
+DorukStation Web v0.62
+
+Fixes
+- Classic system surfaces now use the selected Flow colour family instead of fixed blue.
+- Store and What's New pageBody height no longer inherits the legacy 770px fixed height.
+- Store and What's New fill the 1920x1080 shell canvas vertically.
+- Startup order is boot -> Flow/Modern background -> input detection -> user selection -> shell reveal.
+- User selection is hidden and non-interactive during boot/input detection.
+- Home apps/top controls remain concealed until login completes.
+- Startup transitions reuse DorukStation enter/exit fades rather than sudden swaps.
+- Input Mode remains session-only from v0.61.
+
+Modern mode
+- Modern background/glitter behavior is unchanged.
+- Classic Flow videos are not used inside Modern surfaces.

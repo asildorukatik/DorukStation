@@ -1,1 +1,0 @@
-Start level songs should only play when a new game has started or it is a new floor, the breach yawns song only play when a new game has started though for story mode only. And they should fade out fast and the fight song should come when its a room to fight

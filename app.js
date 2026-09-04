@@ -132,7 +132,7 @@ const S={
  pageOpen:false,pageItems:[],pageIndex:0,pageCols:1,pageMode:"list",pageStack:[],pageReturnZone:"home",
  switcher:false,switcherIndex:0,appSurface:false,currentRunningId:null,
  lastButtons:[],axisLatch:false,
- userSelectOpen:false,userIndex:0,createChoiceOpen:false,createChoiceIndex:0,createUserOpen:false,createUserIndex:0,
+ userSelectOpen:true,userIndex:0,createChoiceOpen:false,createChoiceIndex:0,createUserOpen:false,createUserIndex:0,
  quickMenuOpen:false,quickMenuIndex:0,quickMenuPane:"main",quickMenuSubIndex:0,shareMenuOpen:false,shareMenuIndex:0,
  theme:{kind:"flow",id:"default"},sounds:true,animation:true,
  username:"User",customBackground:null
@@ -3303,8 +3303,9 @@ function v38SetInputMode(mode,{persist=true,announce=false}={}){
 function v38GateVisible(){const g=document.querySelector('#controllerGate');return !!g&&!g.classList.contains('hidden')&&!currentProfile}
 function v38UpdateGateCopy(){
  const gate=document.querySelector('#controllerGate');if(!gate)return;gate.classList.add('v38-input-detect');
- const title=gate.querySelector('h1'),hint=document.querySelector('#inputDetectHint'),status=document.querySelector('#inputModeGateStatus'),mode=v38InputMode();
+ const title=gate.querySelector('#controllerGateHeadline'),hint=document.querySelector('#inputDetectHint'),status=document.querySelector('#inputModeGateStatus'),mode=v38InputMode(),top=document.querySelector('#controllerGateTopLine');
  if(title)title.textContent='Press any button or click/tap anywhere';
+ if(top)top.textContent='Press any button on your controller, or click / tap anywhere.';
  if(hint)hint.textContent=mode?`Current Input Mode: ${v38InputModeLabel(mode)}`:'Touch → Mobile · Keyboard / Mouse → PC · Controller → Controller';
  if(status)status.textContent=mode?`Input Mode is locked to ${v38InputModeLabel(mode)} until you change it in Settings.`:'DorukStation will remember the detected Input Mode until you change it in Settings.';
  const old=document.querySelector('#playWithoutController');if(old){old.classList.add('hidden');old.setAttribute('aria-hidden','true')}
@@ -3463,196 +3464,1343 @@ v38UpdateGateCopy();v37SyncMobileControls(true);
 const v38UpdateDebugBase=updateDebug;
 updateDebug=function(...args){const out=v38UpdateDebugBase(...args),d=document.querySelector('#debug');if(d&&!d.classList.contains('hidden')){d.textContent=d.textContent.replace(/^v0\.\d+/m,'v0.38');d.textContent+=`\ninputMode=${v38InputModeLabel()} touchOverlay=${v37ShouldShow()?'visible':'hidden'}`}return out};
 
-
 /* ========================================================================== */
-/* DorukStation Web v0.39 — pre-login privacy + wireless system settings      */
+/* DorukStation Web v0.39 — mobile panel safe-fit + phone controller spacing  */
 /* ========================================================================== */
 window.__dorukstationVersion='0.39';
 
-/* The input gate must be the first interactive surface. Never expose account
-   cards or the installed-app row underneath it, even for a single frame. */
-for(const sel of ['#userSelect','#createUserChoice','#createUserView','#avatarPicker']){
- const el=document.querySelector(sel);if(el)el.classList.add('hidden');
-}
-S.userSelectOpen=false;S.createChoiceOpen=false;S.createUserOpen=false;
+function v39MobileMode(){return typeof v38InputMode==='function'&&v38InputMode()==='mobile'}
+function v39SyncBodyMode(){document.body.classList.toggle('input-mobile',v39MobileMode())}
 
-/* Before a user is selected there is no per-user UI mode yet. Reuse the last
-   chosen global UI mode so the neutral gate looks like the shell the owner last
-   used: Classic blue Flow or Modern dark/glitter. */
-function v39ApplyPreloginUiMode(){
+/* Scale a visible game UI panel only when its unscaled bounds get too close to
+   a phone edge. This deliberately does NOT scale the game canvas/world. */
+function v39FitFramePanels(doc){
  try{
-  const last=localStorage.getItem(V26_LAST_UI_MODE_KEY)||'classic';
-  S.uiMode=last==='modern'?'modern':'classic';
-  v26ApplyUiModeClass?.();
+  if(!doc?.documentElement)return;
+  const w=doc.defaultView;if(!w)return;
+  const mobile=v39MobileMode();
+  doc.documentElement.classList.toggle('ds39-mobile-hosted',mobile);
+  const candidates=new Set([
+   ...doc.querySelectorAll('.panel,.menuPanel,[role="dialog"],.modal,.dialog,.popup,.settingsPanel,.settings-panel'),
+   ...doc.querySelectorAll('.overlay > div:first-child')
+  ]);
+  for(const el of candidates){
+   if(!(el instanceof w.HTMLElement))continue;
+   /* Clear our previous fit before measuring the current layout. */
+   if(el.dataset.ds39Fit==='1'){
+    el.style.removeProperty('scale');
+    el.style.removeProperty('transform-origin');
+    delete el.dataset.ds39Fit;
+   }
+   if(!mobile)continue;
+   const cs=w.getComputedStyle(el);
+   if(cs.display==='none'||cs.visibility==='hidden'||Number(cs.opacity)===0)continue;
+   const r=el.getBoundingClientRect();
+   if(r.width<80||r.height<50)continue;
+   const vw=Math.max(1,w.innerWidth||doc.documentElement.clientWidth||1);
+   const vh=Math.max(1,w.innerHeight||doc.documentElement.clientHeight||1);
+   /* More margin on notched phones, but do not waste a large percentage of a
+      very short landscape screen. */
+   const margin=Math.max(10,Math.min(22,Math.round(Math.min(vw,vh)*.032)));
+   const usableW=Math.max(1,vw-margin*2),usableH=Math.max(1,vh-margin*2);
+   const closeToEdge=r.left<margin||r.top<margin||r.right>vw-margin||r.bottom>vh-margin;
+   if(!closeToEdge)continue;
+   let factor=Math.min(1,usableW/r.width,usableH/r.height);
+   /* Avoid microscopic UI. If a panel is enormously tall it remains scrollable
+      and receives the strongest safe shrink we allow. */
+   factor=Math.max(.68,Math.min(.96,factor*.985));
+   if(factor<.995){
+    el.style.setProperty('transform-origin','center center','important');
+    el.style.setProperty('scale',factor.toFixed(3),'important');
+    el.dataset.ds39Fit='1';
+   }
+  }
  }catch{}
 }
-v39ApplyPreloginUiMode();
 
-/* Keep Home/apps completely private behind the input gate while preserving the
-   real Flow/Modern background layers. */
-const v39ShowGateBase=v19ShowControllerGate;
-v19ShowControllerGate=function(){
- v39ApplyPreloginUiMode();document.body.classList.add('input-gate-open');
- const out=v39ShowGateBase();v39UpdateGateCopy();return out;
-};
-const v39HideGateBase=v19HideControllerGate;
-v19HideControllerGate=function(){
- const out=v39HideGateBase();
- setTimeout(()=>document.body.classList.remove('input-gate-open'),UI_EXIT_MS+30);
+function v39InstallFrameSafeFit(iframe){
+ if(!iframe||iframe.__dorukstationV39SafeFit)return;
+ iframe.__dorukstationV39SafeFit=true;
+ const bind=()=>{
+  try{
+   const doc=iframe.contentDocument,w=iframe.contentWindow;if(!doc||!w)return;
+   let style=doc.getElementById('dorukstation-v39-mobile-safe-style');
+   if(!style){
+    style=doc.createElement('style');style.id='dorukstation-v39-mobile-safe-style';
+    style.textContent=`
+html.ds39-mobile-hosted body{overscroll-behavior:none}
+html.ds39-mobile-hosted .overlay{box-sizing:border-box;padding-left:max(10px,env(safe-area-inset-left))!important;padding-right:max(10px,env(safe-area-inset-right))!important;padding-top:max(10px,env(safe-area-inset-top))!important;padding-bottom:max(10px,env(safe-area-inset-bottom))!important}
+html.ds39-mobile-hosted .panel,html.ds39-mobile-hosted .menuPanel,html.ds39-mobile-hosted [role="dialog"],html.ds39-mobile-hosted .modal,html.ds39-mobile-hosted .dialog,html.ds39-mobile-hosted .popup{max-width:calc(100vw - 20px)!important;max-height:calc(100dvh - 20px)!important;overflow:auto}
+@media (orientation:landscape) and (max-height:560px){
+ html.ds39-mobile-hosted .panel,html.ds39-mobile-hosted .menuPanel{border-radius:min(18px,3vh)!important}
+}
+`;
+    (doc.head||doc.documentElement).appendChild(style);
+   }
+   const run=()=>requestAnimationFrame(()=>v39FitFramePanels(doc));
+   if(doc.__dorukstationV39PanelObserver)try{doc.__dorukstationV39PanelObserver.disconnect()}catch{}
+   const mo=new w.MutationObserver(run);
+   mo.observe(doc.documentElement,{subtree:true,childList:true,attributes:true,attributeFilter:['class','hidden','open']});
+   doc.__dorukstationV39PanelObserver=mo;
+   w.addEventListener('resize',run,{passive:true});
+   w.addEventListener('orientationchange',run,{passive:true});
+   run();setTimeout(run,80);setTimeout(run,300);
+  }catch{}
+ };
+ iframe.addEventListener('load',bind);bind();
+}
+
+function v39RefreshFrameSafeFit(){
+ v39SyncBodyMode();
+ for(const iframe of document.querySelectorAll('#appSurface iframe')){
+  v39InstallFrameSafeFit(iframe);
+  try{v39FitFramePanels(iframe.contentDocument)}catch{}
+ }
+}
+
+/* Keep the selected Input Mode as the single source of truth for both overlay
+   visibility and mobile layout behavior. */
+if(typeof v38SetInputMode==='function'){
+ const v39SetInputModeBase=v38SetInputMode;
+ v38SetInputMode=function(...args){const out=v39SetInputModeBase(...args);v39RefreshFrameSafeFit();return out};
+}
+
+new MutationObserver(muts=>{
+ for(const m of muts)for(const n of m.addedNodes)if(n?.tagName==='IFRAME')v39InstallFrameSafeFit(n);
+}).observe(document.querySelector('#appSurface'),{childList:true});
+
+addEventListener('resize',()=>{v39RefreshFrameSafeFit()},{passive:true});
+addEventListener('orientationchange',()=>setTimeout(v39RefreshFrameSafeFit,80),{passive:true});
+v39RefreshFrameSafeFit();
+
+const v39UpdateDebugBase=updateDebug;
+updateDebug=function(...args){const out=v39UpdateDebugBase(...args),d=document.querySelector('#debug');if(d&&!d.classList.contains('hidden')){d.textContent=d.textContent.replace(/^v0\.\d+/m,'v0.39');d.textContent+=`\nmobileSafeFit=${v39MobileMode()?'on':'off'}`}return out};
+
+/* ========================================================================== */
+/* v0.40 — PS5 reference pass: modern top icons, media tab, control center,  */
+/*         richer pages, and a more PS4-like classic library.                 */
+/* ========================================================================== */
+window.__dorukstationVersion='0.40';
+if(!('homeSection' in S))S.homeSection='games';
+let v40ControlCenterOpen=false;
+const V40_TOP_QUICK_IDS=['search','settings','profile'];
+
+function v40SvgData(bg,fg,label,sub=''){
+ const esc=t=>String(t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+ const svg=`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><defs><linearGradient id="g" x1="0" x2="1" y1="0" y2="1"><stop offset="0%" stop-color="${bg}"/><stop offset="100%" stop-color="#101828"/></linearGradient></defs><rect width="512" height="512" rx="82" fill="url(#g)"/><rect x="18" y="18" width="476" height="476" rx="66" fill="none" stroke="rgba(255,255,255,.18)"/><text x="50%" y="46%" fill="${fg}" font-family="Arial, Helvetica, sans-serif" font-size="76" font-weight="700" text-anchor="middle">${esc(label)}</text>${sub?`<text x="50%" y="61%" fill="rgba(255,255,255,.86)" font-family="Arial, Helvetica, sans-serif" font-size="26" text-anchor="middle">${esc(sub)}</text>`:''}</svg>`;
+ return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
+}
+const V40_SEARCH_ICON=v40SvgData('#2f6df6','#fff','⌕','Search');
+const V40_DISCOVER_ICON=v40SvgData('#365cff','#fff','▷','Discover');
+const V40_ALL_APPS_ICON=v40SvgData('#59657f','#fff','▦','All Apps');
+const V40_NETFLIX_ICON=v40SvgData('#d11625','#fff','N','Netflix');
+const V40_YOUTUBE_ICON=v40SvgData('#c53030','#fff','▶','YouTube');
+const V40_SPOTIFY_ICON=v40SvgData('#1db954','#fff','♬','Spotify');
+const V40_APPLETV_ICON=v40SvgData('#7a859e','#fff','tv','Apple TV');
+const V40_AMBIENT_WAVE='assets/wave/flow2.png';
+
+if(!quickItems.some(q=>q.id==='search'))quickItems.unshift({id:'search',name:'Search',image:V40_SEARCH_ICON,subtitle:'Search games, apps and media'});
+
+function v40MakeMediaApp(id,name,image,desc,heroTitle,heroText,shelf=[]){
+ return {id,name,image,desc,live:heroText,type:'image',action:id==='discover'?'media-discover':'media-app',heroTitle,heroText,shelf};
+}
+const V40_MEDIA_APPS=[
+ v40MakeMediaApp('discover','Discover',V40_DISCOVER_ICON,'Video and music recommendations.','Discover','Video and music recommendations on one screen.',[
+  {title:'Netflix',note:'Featured picks',image:V40_NETFLIX_ICON},
+  {title:'Prime Video',note:'Popular',image:v40SvgData('#2d82ff','#fff','Prime','Video')},
+  {title:'Apple TV',note:'Latest',image:V40_APPLETV_ICON},
+  {title:'YouTube',note:'Subscriptions',image:V40_YOUTUBE_ICON}
+ ]),
+ v40MakeMediaApp('netflix','Netflix',V40_NETFLIX_ICON,'Streaming app placeholder.','Netflix','Watch movies, shows and recommendations.',[
+  {title:'The Witcher',note:'Trending now',image:v40SvgData('#3d4558','#fff','WITCHER','')},
+  {title:'Black Mirror',note:'Sci-fi',image:v40SvgData('#162238','#fff','BLACK','MIRROR')},
+  {title:'Extraction 2',note:'Action',image:v40SvgData('#0f4a88','#fff','EXTRACTION','2')}
+ ]),
+ v40MakeMediaApp('youtube','YouTube',V40_YOUTUBE_ICON,'Video app placeholder.','YouTube','Creators, music videos and highlights.',[
+  {title:'Subscriptions',note:'Recent uploads',image:V40_YOUTUBE_ICON},
+  {title:'Music',note:'Mixes',image:v40SvgData('#0e7490','#fff','MUSIC','')},
+  {title:'Gaming',note:'Live now',image:v40SvgData('#7c3aed','#fff','GAMING','')}
+ ]),
+ v40MakeMediaApp('spotify','Spotify',V40_SPOTIFY_ICON,'Music app placeholder.','Spotify','Albums, playlists and podcasts.',[
+  {title:'Daily Mix',note:'For you',image:V40_SPOTIFY_ICON},
+  {title:'Albums',note:'New releases',image:v40SvgData('#0d9488','#fff','ALBUMS','')},
+  {title:'Podcasts',note:'Continue listening',image:v40SvgData('#3f8c4a','#fff','POD','CASTS')}
+ ]),
+ v40MakeMediaApp('allmedia','All Apps',V40_ALL_APPS_ICON,'Every media app on DorukStation.','All Apps','Browse all installed media applications.',[
+  {title:'Netflix',note:'Installed',image:V40_NETFLIX_ICON},
+  {title:'Apple TV',note:'Installed',image:V40_APPLETV_ICON},
+  {title:'Spotify',note:'Installed',image:V40_SPOTIFY_ICON},
+  {title:'YouTube',note:'Installed',image:V40_YOUTUBE_ICON}
+ ])
+];
+
+function v40InstallHomeExtras(){
+ const quickRow=document.querySelector('#quickRow');
+ const home=document.querySelector('#homeArea');
+ if(quickRow&&!document.querySelector('#v40HomeTabs'))quickRow.insertAdjacentHTML('afterbegin',`<div id="v40HomeTabs" aria-label="Home Sections"><button type="button" class="v40-home-tab active" data-section="games">Games</button><button type="button" class="v40-home-tab" data-section="media">Media</button></div>`);
+ if(home&&!document.querySelector('#v40HeroPanel'))home.insertAdjacentHTML('beforeend',`<div id="v40HeroPanel"><div id="v40HeroArt"></div><div id="v40HeroWave"></div><div id="v40HeroShade"></div></div><div id="v40Shelf"><div id="v40ShelfTitle">Explore</div><div id="v40ShelfRow"></div></div>`);
+ if(document.querySelector('#v40HomeTabs'))document.querySelectorAll('#v40HomeTabs .v40-home-tab').forEach(btn=>btn.onclick=()=>v40SetHomeSection(btn.dataset.section||'games'));
+ const stage=document.querySelector('#stage');
+ if(stage&&!document.querySelector('#v40ControlCenter'))stage.insertAdjacentHTML('beforeend',`<section id="v40ControlCenter" class="hidden" aria-label="Control Center"><div class="v40-cc-panel"><div class="v40-cc-cards" id="v40ControlCards"></div><div class="v40-cc-icons" id="v40ControlIcons"></div></div></section>`);
+}
+v40InstallHomeExtras();
+
+function v40GameHomeItems(){ensureLibraryLast();return apps.slice()}
+function v40CurrentHomeItems(){return (v26UiMode()==='modern'&&S.homeSection==='media')?V40_MEDIA_APPS:v40GameHomeItems()}
+function v40FocusedHomeApp(){const items=v40CurrentHomeItems();if(!items.length)return null;S.app=Math.max(0,Math.min(items.length-1,S.app));return items[S.app]}
+function v40SetHomeSection(section){
+ if(section!=='media')section='games';
+ S.homeSection=section;S.app=0;v40CloseControlCenter(false);render();
+}
+function v40EnsureTopQuick(){
+ const visible=quickItems.filter(q=>V40_TOP_QUICK_IDS.includes(q.id));
+ if(!visible.length)return;
+ const current=quickItems[S.quick];
+ if(!current||!V40_TOP_QUICK_IDS.includes(current.id))S.quick=quickItems.findIndex(q=>q.id===visible[0].id);
+}
+function v40CanUseModernHome(){return typeof v26UiMode==='function'&&v26UiMode()==='modern'}
+
+function v40HeroDataFor(item){
+ if(!item)return {title:'DorukStation',desc:'Select an item.',art:'',shelf:[]};
+ if(S.homeSection==='media')return {title:item.heroTitle||item.name,desc:item.heroText||item.desc||'',art:item.image||'',shelf:item.shelf||[]};
+ const banners=Array.isArray(item.banners)?item.banners:[];
+ if(item.id==='store')return {title:'DorukStation Store',desc:'Browse games and applications with a more PS5-like featured look.',art:'assets/themes/tron.jpg',shelf:[{title:'Featured',note:'Store spotlight',image:'assets/skin/store.png'},{title:'Recently Added',note:'New on DorukStation',image:(apps.find(a=>a.id==='dorukcraft-dungeons')||item).image||'assets/skin/store.png'},{title:'Game Library',note:'Installed games',image:'assets/skin/flow/content/library.png'}]};
+ if(item.id==='whatsnew')return {title:item.name,desc:'Recent games, activity and DorukStation updates.',art:'assets/themes/horizon.jpg',shelf:[{title:'Recently Played',note:'Your latest games',image:(v40GameHomeItems().find(a=>a.id==='dorukcraft')||item).image||item.image},{title:'Official News',note:'System updates',image:'assets/skin/now.png'},{title:'Capture Gallery',note:'Recent clips',image:'assets/skin/flow/content/gallery.png'}]};
+ if(item.id==='library')return {title:'Game Library',desc:'Browse installed games, applications and imported HTML apps.',art:'assets/themes/destiny.jpg',shelf:v40GameHomeItems().filter(a=>a.id!=='library').slice(0,6).map(a=>({title:a.name,note:a.folderGame?'Games folder':a.userAdded?'Imported HTML':'Installed',image:a.image||V40_ALL_APPS_ICON}))};
+ if(item.id==='dorukcraft')return {title:'DorukCraft',desc:item.desc,art:banners[0]||'assets/themes/anniversary.jpg',shelf:[{title:'Play',note:'Resume crafting',image:item.image||V40_DISCOVER_ICON},{title:'Library',note:'Other installed games',image:'assets/skin/flow/content/library.png'},{title:'Store',note:'Browse more',image:'assets/skin/store.png'}]};
+ if(banners.length)return {title:item.name,desc:item.desc||item.live||'',art:banners[0],shelf:banners.map((src,i)=>({title:`Preview ${i+1}`,note:item.name,image:src})).slice(0,6)};
+ return {title:item.name,desc:item.desc||item.live||'',art:item.image||'assets/themes/battlefield.jpg',shelf:[{title:item.name,note:'Selected item',image:item.image||V40_DISCOVER_ICON}]};
+}
+
+function v40RenderHero(item){
+ const hero=v40HeroDataFor(item),art=document.querySelector('#v40HeroArt'),row=document.querySelector('#v40ShelfRow'),title=document.querySelector('#v40ShelfTitle');
+ if(art){art.style.backgroundImage=hero.art?`url("${hero.art}")`:'';art.classList.toggle('has-art',!!hero.art)}
+ if(title)title.textContent=S.homeSection==='media'?'For you':'Explore';
+ if(row)row.innerHTML=(hero.shelf||[]).map((x,i)=>`<button class="v40-shelf-card" data-i="${i}" type="button"><div class="v40-shelf-thumb" style="background-image:url('${x.image||''}')"></div><div class="v40-shelf-text"><b>${esc(x.title||'')}</b><span>${esc(x.note||'')}</span></div></button>`).join('');
+ document.body.classList.toggle('v40-home-media',S.homeSection==='media');
+ const tabs=document.querySelectorAll('#v40HomeTabs .v40-home-tab');
+ tabs.forEach(btn=>btn.classList.toggle('active',(btn.dataset.section||'games')===S.homeSection));
+}
+
+const v40RenderQuickBase=renderQuick;
+renderQuick=function(...args){
+ const out=v40RenderQuickBase(...args);
+ v40InstallHomeExtras();
+ if(!v40CanUseModernHome())return out;
+ v40EnsureTopQuick();
+ const row=document.querySelector('#quickButtons');
+ const visible=quickItems.filter(q=>V40_TOP_QUICK_IDS.includes(q.id));
+ row.innerHTML=visible.map(q=>{const i=quickItems.findIndex(x=>x.id===q.id);const focused=S.zone==='top'&&S.quick===i&&!S.pageOpen;return `<button class="quick-button ${focused?'focused':''} ${q.avatar?'avatar':''}" data-qi="${i}" title="${esc(q.name)}">${q.avatar?`<img src="${avatarForProfile(currentProfile)}" alt="${esc(S.username)}">`:`<img src="${q.image}" alt="">`}</button>`}).join('');
+ row.querySelectorAll('.quick-button').forEach(el=>el.onclick=()=>{S.zone='top';S.quick=Number(el.dataset.qi);render();activate()});
+ const current=quickItems[S.quick]||visible[0];
+ document.querySelector('#quickTitle').textContent=current?.name||'';
  return out;
 };
 
-function v39UpdateGateCopy(){
- const gate=document.querySelector('#controllerGate');if(!gate)return;
- gate.classList.add('v39-input-gate');
- const title=gate.querySelector('h1'),hint=document.querySelector('#inputDetectHint'),status=document.querySelector('#inputModeGateStatus'),mode=v38InputMode();
- if(title)title.textContent='Press any button or click/tap anywhere';
- if(hint)hint.textContent=mode
-   ?`Input Mode: ${v38InputModeLabel(mode)}`
-   :'Touch = Mobile · Keyboard / Mouse = PC · Controller = Controller';
- if(status)status.textContent=mode
-   ?'Your saved Input Mode stays active. Change it later in Settings → Input Mode.'
-   :'User selection appears only after DorukStation receives your first input.';
-}
-const v39GateCopyBase=v38UpdateGateCopy;
-v38UpdateGateCopy=function(){try{v39GateCopyBase()}catch{};v39UpdateGateCopy()};
-
-/* -------------------------------------------------------------------------- */
-/* Native-system bridge                                                       */
-/* -------------------------------------------------------------------------- */
-/* A normal HTTPS web page cannot enumerate SSIDs, toggle Wi-Fi, or control
-   system Bluetooth. DorukStation therefore supports a same-origin native bridge
-   when launched through serve.sh / DorukStation OS. GitHub Pages stays safe and
-   falls back to browser-visible status + Web Bluetooth LE pairing when offered. */
-function v39LocalSystemHost(){return ['127.0.0.1','localhost','::1'].includes(location.hostname)}
-async function v39SystemCall(action,payload={}){
- if(window.DorukStationSystem&&typeof window.DorukStationSystem.call==='function'){
-  const r=await window.DorukStationSystem.call(action,payload);return r||{};
- }
- if(!v39LocalSystemHost())throw new Error('native-bridge-unavailable');
- const r=await fetch(`/__dorukstation/api/${action}`,{
-  method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload||{}),cache:'no-store'
- });
- let data={};try{data=await r.json()}catch{}
- if(!r.ok||data.ok===false)throw new Error(data.error||`system-api-${r.status}`);
- return data;
-}
-async function v39SystemStatus(){
- try{return await v39SystemCall('status')}catch{return {ok:false,bridge:false,wifi:{available:false},bluetooth:{available:false}}}
-}
-function v39SetPageItemsIf(title,items,subtitle){
- if(document.querySelector('#pageTitle')?.textContent!==title)return;
- S.pageItems=items;S.pageIndex=Math.max(0,Math.min(S.pageIndex,Math.max(0,items.length-1)));
- if(subtitle!==undefined){const el=document.querySelector('#pageSubtitle');if(el)el.textContent=subtitle||''}
- renderPage();
-}
-function v39Notify(title,text=''){
- try{pushSystemNotification('',title,text,currentProfile)}catch{console.log(title,text)}
-}
-
-/* ---- Wi-Fi --------------------------------------------------------------- */
-async function v39RefreshWifiPage(){
- const st=await v39SystemStatus(),w=st.wifi||{};
- if(!st.bridge||!w.available){
-  v39SetPageItemsIf('Wi-Fi',[
-   {title:'Internet Status',note:navigator.onLine?'Online':'Offline',disabled:true},
-   {title:'Wi-Fi System Control',note:'Available when DorukStation runs through its local system bridge',disabled:true},
-   {title:'GitHub Pages / normal browser',note:'Browsers are not allowed to read SSIDs, passwords, or toggle operating-system Wi-Fi',disabled:true},
-   {title:'DorukStation OS',note:'Run ./serve.sh on Linux to enable NetworkManager controls here',disabled:true}
-  ],'Browser-safe network status. Full Wi-Fi control activates automatically in DorukStation OS/local mode.');
-  return;
- }
- const on=!!w.powered,connected=w.connection||'Not connected';
- v39SetPageItemsIf('Wi-Fi',[
-  {title:'Wi-Fi',note:on?'On':'Off',action:async()=>{try{await v39SystemCall('wifi/power',{enabled:!on});v39Notify('Wi-Fi',!on?'Turned on':'Turned off');await v39RefreshWifiPage()}catch(e){v39Notify('Wi-Fi change failed',e.message)}}},
-  {title:'Connection',note:connected,disabled:true},
-  {title:'Signal',note:w.signal?`${w.signal}%`:'—',disabled:true},
-  {title:'Available Networks',note:'Scan and connect',action:v39OpenWifiNetworksPage},
-  {title:'Disconnect',note:w.connection?'Disconnect current Wi-Fi':'No active Wi-Fi',disabled:!w.connection,action:async()=>{try{await v39SystemCall('wifi/disconnect');v39Notify('Wi-Fi disconnected');await v39RefreshWifiPage()}catch(e){v39Notify('Disconnect failed',e.message)}}},
-  {title:'Refresh',action:v39RefreshWifiPage}
- ],'Wi-Fi settings are provided by the DorukStation system bridge.');
-}
-function v39OpenWifiPage(){
- openPage({title:'Wi-Fi',subtitle:'Checking Wi-Fi…',icon:'assets/skin/flow/function/setting.png',items:[{title:'Checking system network…',disabled:true}]},true);
- v39RefreshWifiPage();
-}
-async function v39OpenWifiNetworksPage(){
- openPage({title:'Available Networks',subtitle:'Scanning Wi-Fi…',items:[{title:'Scanning…',disabled:true}]},true);
- try{
-  const data=await v39SystemCall('wifi/scan'),nets=Array.isArray(data.networks)?data.networks:[];
-  const unique=[];const seen=new Set();for(const n of nets){const key=n.ssid||'';if(!key||seen.has(key))continue;seen.add(key);unique.push(n)}
-  const items=unique.map(n=>({
-   title:n.ssid,note:`${n.signal||0}%${n.security&&n.security!=='--'?` · ${n.security}`:' · Open'}${n.active?' · Connected':''}`,
-   action:n.active?undefined:async()=>{
-    let password='';if(n.security&&n.security!=='--'&&n.security!=='OPEN')password=prompt(`Password for ${n.ssid}`,'')||'';
-    try{v39Notify('Wi-Fi',`Connecting to ${n.ssid}…`);await v39SystemCall('wifi/connect',{ssid:n.ssid,password});v39Notify('Wi-Fi connected',n.ssid);backPage();setTimeout(v39RefreshWifiPage,120)}catch(e){v39Notify('Wi-Fi connection failed',e.message)}
-   },disabled:!!n.active
-  }));
-  items.push({title:'Rescan',action:()=>{backPage();setTimeout(v39OpenWifiNetworksPage,80)}});
-  v39SetPageItemsIf('Available Networks',items.length?items:[{title:'No Wi-Fi networks found',disabled:true}],'Select a network to connect.');
- }catch(e){v39SetPageItemsIf('Available Networks',[{title:'Wi-Fi scan unavailable',note:e.message,disabled:true}], 'The native system bridge could not scan Wi-Fi.');}
-}
-
-/* ---- Bluetooth ----------------------------------------------------------- */
-async function v39RefreshBluetoothPage(){
- const st=await v39SystemStatus(),b=st.bluetooth||{};
- if(!st.bridge||!b.available){
-  const items=[
-   {title:'Bluetooth System Control',note:'Available in DorukStation OS/local system mode',disabled:true}
-  ];
-  if(navigator.bluetooth?.requestDevice)items.push({title:'Pair Bluetooth LE Device',note:'Browser Web Bluetooth fallback',action:v39WebBluetoothPair});
-  items.push({title:'Browser limitation',note:'Web Bluetooth can pair supported BLE/GATT devices but cannot replace full OS Bluetooth settings',disabled:true});
-  v39SetPageItemsIf('Bluetooth',items,'Full Bluetooth control activates automatically when the DorukStation system bridge is available.');
-  return;
- }
- const on=!!b.powered;
- v39SetPageItemsIf('Bluetooth',[
-  {title:'Bluetooth',note:on?'On':'Off',action:async()=>{try{await v39SystemCall('bluetooth/power',{enabled:!on});v39Notify('Bluetooth',!on?'Turned on':'Turned off');await v39RefreshBluetoothPage()}catch(e){v39Notify('Bluetooth change failed',e.message)}}},
-  {title:'Pair New Device',note:on?'Scan nearby devices':'Turn Bluetooth on first',disabled:!on,action:v39OpenBluetoothScanPage},
-  {title:'Paired Devices',note:String(b.pairedCount??0),action:v39OpenPairedBluetoothPage},
-  {title:'Refresh',action:v39RefreshBluetoothPage}
- ],'Bluetooth settings are provided by the DorukStation system bridge.');
-}
-function v39OpenBluetoothPage(){openPage({title:'Bluetooth',subtitle:'Checking Bluetooth…',items:[{title:'Checking system Bluetooth…',disabled:true}]},true);v39RefreshBluetoothPage()}
-async function v39WebBluetoothPair(){
- try{const d=await navigator.bluetooth.requestDevice({acceptAllDevices:true,optionalServices:[]});v39Notify('Bluetooth LE device selected',d.name||d.id||'Device')}catch(e){if(e?.name!=='NotFoundError')v39Notify('Bluetooth pairing failed',e.message||String(e))}
-}
-async function v39OpenBluetoothScanPage(){
- openPage({title:'Bluetooth Devices',subtitle:'Scanning nearby devices…',items:[{title:'Scanning…',disabled:true}]},true);
- try{
-  const data=await v39SystemCall('bluetooth/scan'),devices=Array.isArray(data.devices)?data.devices:[];
-  const items=devices.map(d=>({title:d.name||d.mac,note:`${d.mac}${d.paired?' · Paired':''}${d.connected?' · Connected':''}`,action:async()=>{
-   try{v39Notify('Bluetooth',`Pairing ${d.name||d.mac}…`);await v39SystemCall('bluetooth/pair',{mac:d.mac});v39Notify('Bluetooth paired',d.name||d.mac);backPage();setTimeout(v39RefreshBluetoothPage,100)}catch(e){v39Notify('Bluetooth pairing failed',e.message)}
-  }}));
-  items.push({title:'Scan Again',action:()=>{backPage();setTimeout(v39OpenBluetoothScanPage,80)}});
-  v39SetPageItemsIf('Bluetooth Devices',items.length?items:[{title:'No Bluetooth devices found',disabled:true}],'Choose a device to pair. Some devices may require confirmation on the device itself.');
- }catch(e){v39SetPageItemsIf('Bluetooth Devices',[{title:'Bluetooth scan unavailable',note:e.message,disabled:true}]);}
-}
-async function v39OpenPairedBluetoothPage(){
- openPage({title:'Paired Bluetooth Devices',subtitle:'Loading paired devices…',items:[{title:'Loading…',disabled:true}]},true);
- try{
-  const data=await v39SystemCall('bluetooth/devices',{paired:true}),devices=Array.isArray(data.devices)?data.devices:[];
-  const items=devices.map(d=>({title:d.name||d.mac,note:`${d.mac}${d.connected?' · Connected':' · Paired'}`,action:async()=>{
-   try{await v39SystemCall(d.connected?'bluetooth/disconnect':'bluetooth/connect',{mac:d.mac});v39Notify('Bluetooth',d.connected?'Disconnected':'Connected');v39OpenPairedBluetoothPage()}catch(e){v39Notify('Bluetooth action failed',e.message)}
-  }}));
-  v39SetPageItemsIf('Paired Bluetooth Devices',items.length?items:[{title:'No paired Bluetooth devices',disabled:true}]);
- }catch(e){v39SetPageItemsIf('Paired Bluetooth Devices',[{title:'Paired devices unavailable',note:e.message,disabled:true}]);}
-}
-function v39OpenDevicesPage(){openPage({title:'Devices',subtitle:'Controllers and Bluetooth devices.',items:[{title:'Controller',note:'Input mappings and assignments',action:openControllerPage},{title:'Bluetooth',note:'Power, pair and connect devices',action:v39OpenBluetoothPage}]},true)}
-
-/* Upgrade the Settings entries without disturbing the existing settings tree. */
-const v39OpenSettingsBase=openSettingsPage;
-openSettingsPage=function(){
- v39OpenSettingsBase();if(!S.pageOpen||document.querySelector('#pageTitle')?.textContent!=='Settings')return;
- const net=S.pageItems.find(x=>x.title==='Network');if(net){net.note=navigator.onLine?'Online · Wi-Fi settings':'Offline · Wi-Fi settings';net.action=v39OpenWifiPage}
- const dev=S.pageItems.find(x=>x.title==='Devices');if(dev){dev.note='Controllers · Bluetooth';dev.action=v39OpenDevicesPage}
- renderPage();
+const v40RenderHomeBase=renderHome;
+renderHome=function(...args){
+ if(!v40CanUseModernHome())return v40RenderHomeBase(...args);
+ v40InstallHomeExtras();
+ const items=v40CurrentHomeItems();
+ if(!items.length){document.querySelector('#appCarousel').innerHTML='';return}
+ S.app=Math.max(0,Math.min(items.length-1,S.app));
+ const c=document.querySelector('#appCarousel'),startBox=document.querySelector('#startBox');
+ if(startBox&&c.contains(startBox))document.querySelector('#homeArea').appendChild(startBox);
+ c.innerHTML=items.map((a,i)=>{const re=runningApps.get(a.id),mine=re?.profileId===currentProfile?.id;return `<div class="app-tile ${S.zone==='home'&&S.app===i&&!S.pageOpen?'focused':''} ${mine?'running':''}" data-i="${i}"><div class="app-icon">${appInner(a)}</div><div class="app-running-dot"></div></div>`}).join('');
+ c.querySelectorAll('.app-tile').forEach(el=>el.onclick=()=>{S.zone='home';S.app=Number(el.dataset.i);render()});
+ const focusedTile=c.querySelector('.app-tile.focused')||c.children[S.app];
+ if(startBox&&focusedTile)focusedTile.appendChild(startBox);
+ const focusedOffset=focusedTile?focusedTile.offsetLeft:(S.app*160);
+ c.style.transform=`translateX(${-focusedOffset}px)`;
+ const a=items[S.app],re=runningApps.get(a.id),running=!!re&&re.profileId===currentProfile?.id;
+ document.querySelector('#appTitle').textContent=(S.homeSection==='media'&&a.heroTitle)?a.heroTitle:a.name;
+ document.querySelector('#appDescription').textContent=(S.homeSection==='media'&&a.heroText)?a.heroText:(a.desc||a.live||'');
+ document.querySelector('#widgetBody').textContent=re&&!running?`${a.live||a.desc} Running for ${re.profileName||'another user'}.`:(a.live||a.desc||'');
+ const canStart=S.zone==='home';
+ document.body.classList.toggle('can-start',canStart);
+ const startLabel=running?'Resume':((a.action==='launch'||a.action==='remote')?'Play':'Open');
+ document.querySelector('#startBoxText').textContent=startLabel;
+ document.querySelector('#startBox').setAttribute('aria-label',`${startLabel} ${a.name}`);
+ document.querySelector('#runningLabel').classList.toggle('hidden',!running);
+ v40RenderHero(a);
 };
 
-/* Keep the gate copy and pre-login mode correct after profile changes/restarts. */
-const v39LoadProfileBase=loadProfileState;
-loadProfileState=function(profile){const out=v39LoadProfileBase(profile);setTimeout(()=>{v39UpdateGateCopy();v37SyncMobileControls(true)},0);return out};
-v39UpdateGateCopy();
+document.querySelector('#startBox').onclick=()=>{
+ if(S.pageOpen||S.zone!=='home'||S.appSurface||v40ControlCenterOpen)return;
+ const item=v40FocusedHomeApp();
+ if(item)activateApp(item);
+};
 
-const v39UpdateDebugBase=updateDebug;
-updateDebug=function(...args){const out=v39UpdateDebugBase(...args),d=document.querySelector('#debug');if(d&&!d.classList.contains('hidden')){d.textContent=d.textContent.replace(/^v0\.\d+/m,'v0.39');d.textContent+=`\nsystemBridge=${v39LocalSystemHost()?'local-capable':'browser-only'}`}return out};
+const v40ActivateBase=activate;
+activate=function(...args){
+ if(v40ControlCenterOpen){const current=quickItems[S.quick];if(current){activateQuick(current.id);v40CloseControlCenter(false)}return}
+ if(S.zone==='home'&&v40CanUseModernHome()){const item=v40FocusedHomeApp();if(item){selectSound();activateApp(item);return}}
+ return v40ActivateBase(...args);
+};
+
+const v40BackBase=back;
+back=function(...args){if(v40ControlCenterOpen){v40CloseControlCenter();return}return v40BackBase(...args)};
+
+const v40ActivateQuickBase=activateQuick;
+activateQuick=function(id){
+ if(id==='search'){
+  openPage({title:'Search',subtitle:'Search your games, apps and media.',icon:V40_SEARCH_ICON,returnZone:'top',items:[
+   {title:'Search is a visual placeholder',note:'Type support can be added later with the on-screen keyboard.',disabled:true},
+   {title:'Games',note:'DorukCraft · Dungeons · Flappy Bird',disabled:true},
+   {title:'Media',note:'Discover · Netflix · YouTube · Spotify',disabled:true}
+  ]});
+  return;
+ }
+ return v40ActivateQuickBase(id);
+};
+
+function v40ControlItems(){return ['plus','marketplace','notifications','friends','messages','profile','settings','power'].map(id=>quickItems.find(q=>q.id===id)).filter(Boolean)}
+function v40RenderControlCenter(){
+ const cards=document.querySelector('#v40ControlCards'),icons=document.querySelector('#v40ControlIcons'),focused=v40FocusedHomeApp();
+ if(cards){
+  const hero=v40HeroDataFor(focused);
+  cards.innerHTML=`<button class="v40-cc-card primary" type="button"><div class="v40-cc-card-art" style="background-image:url('${hero.art||''}')"></div><div class="v40-cc-card-body"><small>New tips available</small><b>Discover More</b><span>Make the most of your DorukStation shell</span></div></button><button class="v40-cc-card" type="button"><div class="v40-cc-card-art tiny" style="background-image:url('${(hero.shelf?.[0]?.image)||focused?.image||''}')"></div><div class="v40-cc-card-body"><small>${esc(focused?.name||'Selected')}</small><b>Official news</b><span>${esc(focused?.desc||focused?.live||'Latest information and updates.')}</span></div></button><button class="v40-cc-card" type="button"><div class="v40-cc-card-art tiny" style="background-image:url('${(hero.shelf?.[1]?.image)||V40_DISCOVER_ICON}')"></div><div class="v40-cc-card-body"><small>Recently created</small><b>New video clip</b><span>Capture Gallery and media shortcuts live here.</span></div></button>`;
+ }
+ if(icons){
+  icons.innerHTML=v40ControlItems().map(q=>`<button class="v40-cc-icon ${q.id===quickItems[S.quick]?.id?'focused':''} ${q.avatar?'avatar':''}" data-id="${q.id}" type="button">${q.avatar?`<img src="${avatarForProfile(currentProfile)}" alt="">`:`<img src="${q.image}" alt="">`}<span>${esc(q.name)}</span></button>`).join('');
+  icons.querySelectorAll('.v40-cc-icon').forEach(btn=>btn.onclick=()=>{const q=quickItems.find(x=>x.id===btn.dataset.id);if(q){S.zone='top';S.quick=quickItems.indexOf(q);v40CloseControlCenter(false);render();activateQuick(q.id)}});
+ }
+}
+function v40OpenControlCenter(){
+ if(v40ControlCenterOpen||!v40CanUseModernHome()||S.pageOpen||S.appSurface||S.userSelectOpen||S.createChoiceOpen||S.createUserOpen)return;
+ v40ControlCenterOpen=true;document.body.classList.add('v40-control-open');
+ const box=document.querySelector('#v40ControlCenter');if(box)box.classList.remove('hidden');
+ v40RenderControlCenter();
+}
+function v40CloseControlCenter(playSound=true){
+ if(!v40ControlCenterOpen)return;
+ v40ControlCenterOpen=false;document.body.classList.remove('v40-control-open');
+ const box=document.querySelector('#v40ControlCenter');if(box)box.classList.add('hidden');
+ if(playSound)backSound?.();
+}
+
+const v40PsShortBase=psShortPress;
+psShortPress=function(){
+ if(v40ControlCenterOpen){v40CloseControlCenter(false);return}
+ if(v40CanUseModernHome()&&!S.appSurface&&!S.pageOpen&&!S.quickMenuOpen&&!S.shareMenuOpen&&S.zone==='home'){v40OpenControlCenter();return}
+ return v40PsShortBase();
+};
+
+const v40V19JumpBase=v19JumpHomeEnd;
+v19JumpHomeEnd=function(right){
+ if(v40CanUseModernHome()&&S.zone==='home'&&!S.pageOpen&&!S.appSurface){v40SetHomeSection(right?'media':'games');navSound?.();return}
+ return v40V19JumpBase(right);
+};
+
+document.addEventListener('keydown',e=>{
+ if(!v40CanUseModernHome()||S.pageOpen||S.appSurface)return;
+ if((e.key==='Tab'||e.key==='q'||e.key==='Q'||e.key==='e'||e.key==='E')&&S.zone==='home'){
+  e.preventDefault();
+  if(e.key==='e'||e.key==='E')v40SetHomeSection('media');
+  else if(e.key==='q'||e.key==='Q')v40SetHomeSection('games');
+  else v40SetHomeSection(S.homeSection==='games'?'media':'games');
+ }
+},true);
+
+function v40PageCover(image,title,note){return `<div class="v40-page-cover"><div class="v40-page-cover-art" style="background-image:url('${image||''}')"></div><div class="v40-page-cover-text"><b>${esc(title||'')}</b><span>${esc(note||'')}</span></div></div>`}
+function v40RenderLibrary(body){
+ const items=S.pageItems||[];
+ if(v40CanUseModernHome()){
+  body.innerHTML=`<div class="v40-library modern"><aside class="v40-library-sidebar"><div class="v40-lib-side-title">Game Library</div><div class="v40-lib-side-note">${esc(document.querySelector('#pageSubtitle')?.textContent||'')}</div><div class="v40-lib-filter active">Installed</div><div class="v40-lib-filter">Your Collection</div><div class="v40-lib-filter">PlayStation Plus</div><div class="v40-lib-spacer"></div><div class="v40-lib-filter small">Search</div><div class="v40-lib-filter small">Sort: Most Recent</div></aside><div class="v40-library-main"><div class="v40-library-grid">${items.map((x,i)=>`<button class="v40-lib-tile ${i===S.pageIndex?'focused':''}" data-i="${i}" type="button">${v40PageCover(x.image||V40_ALL_APPS_ICON,x.title,x.note||'')}</button>`).join('')}</div></div></div>`;
+ }else{
+  const countGames=items.length;
+  body.innerHTML=`<div class="v40-library classic"><aside class="v40-classic-sidebar"><div class="v40-classic-heading">Library</div><div class="v40-classic-search">⌕ Search</div><div class="v40-classic-cat">All <span>${countGames}</span></div><div class="v40-classic-cat">Folders <span>${apps.filter(a=>a.inFolder).length}</span></div><div class="v40-classic-cat active">Games <span>${countGames}</span></div><div class="v40-classic-cat">Applications <span>${Math.max(1,items.filter(x=>!/dorukcraft|flappy|dungeon/i.test(x.title)).length)}</span></div><div class="v40-classic-cat">Purchased <span>${countGames+158}</span></div></aside><div class="v40-classic-main"><div class="v40-classic-topbar"><span>Name: A-Z</span></div><div class="v40-classic-grid">${items.map((x,i)=>`<button class="v40-classic-tile ${i===S.pageIndex?'focused':''}" data-i="${i}" type="button"><div class="v40-classic-thumb" style="background-image:url('${x.image||V40_ALL_APPS_ICON}')"></div><div class="v40-classic-title">${esc(x.title)}</div></button>`).join('')}</div></div></div>`;
+ }
+ body.querySelectorAll('[data-i]').forEach(el=>el.onclick=()=>{S.pageIndex=Number(el.dataset.i);activatePage()});
+}
+
+openLibraryPage=function(){
+ const items=apps.filter(a=>a.id!=='library').map(a=>({title:a.name,note:a.folderGame?'Games folder':a.userAdded?'Imported HTML':'Installed',image:a.image||V40_ALL_APPS_ICON,action:()=>{backPage();S.zone='home';S.homeSection='games';S.app=Math.max(0,v40GameHomeItems().findIndex(x=>x.id===a.id));render()}}));
+ items.push({title:'Add HTML App',note:'Choose a standalone .html file',image:'assets/skin/add.png',action:()=>{document.querySelector('#htmlPicker').dataset.mode='new';document.querySelector('#htmlPicker').click()}});
+ openPage({title:'Library',subtitle:v40CanUseModernHome()?'Browse installed games and applications.':'Games, applications and purchases.',icon:'assets/skin/flow/content/library.png',returnZone:'home',mode:'grid',cols:5,items,renderCustom:v40RenderLibrary});
+};
+
+function v40RenderMediaDiscover(body){
+ const services=S.pageItems.slice(0,8),recs=S.pageItems.slice(8);
+ body.innerHTML=`<div class="v40-media-page"><div class="v40-media-hero"><div class="v40-media-hero-copy"><div class="v40-media-eyebrow">Discover</div><h2>Video</h2><h3>Music</h3><p>Watch unlimited movies, TV shows and more.</p></div><div class="v40-media-hero-card"><div class="v40-media-hero-poster" style="background-image:url('${V40_NETFLIX_ICON}')"></div><div class="v40-media-hero-strip">${['The Witcher','Black Mirror','Extraction 2'].map(t=>`<div class="v40-media-mini">${esc(t)}</div>`).join('')}</div></div></div><div class="v40-media-service-row">${services.map((x,i)=>`<button class="v40-media-service ${i===S.pageIndex?'focused':''}" data-i="${i}" type="button"><img src="${x.image}" alt=""><span>${esc(x.title)}</span></button>`).join('')}</div><div class="v40-media-section-head">For you</div><div class="v40-media-rec-row">${recs.map((x,j)=>`<button class="v40-media-rec ${S.pageIndex===services.length+j?'focused':''}" data-i="${services.length+j}" type="button"><div class="v40-media-rec-art" style="background-image:url('${x.image||V40_DISCOVER_ICON}')"></div><div class="v40-media-rec-title">${esc(x.title)}</div></button>`).join('')}</div></div>`;
+ body.querySelectorAll('[data-i]').forEach(el=>el.onclick=()=>{S.pageIndex=Number(el.dataset.i);activatePage()});
+}
+function v40OpenMediaDiscoverPage(){
+ const services=[
+  {title:'Disney+',image:v40SvgData('#2f6df6','#fff','D+',''),disabled:true},
+  {title:'Netflix',image:V40_NETFLIX_ICON,disabled:true},
+  {title:'Prime Video',image:v40SvgData('#2d82ff','#fff','Prime',''),disabled:true},
+  {title:'MBC',image:v40SvgData('#6b7280','#fff','MBC',''),disabled:true},
+  {title:'Apple TV',image:V40_APPLETV_ICON,disabled:true},
+  {title:'YouTube',image:V40_YOUTUBE_ICON,disabled:true},
+  {title:'Twitch',image:v40SvgData('#7c3aed','#fff','Twitch',''),disabled:true},
+  {title:'Spotify',image:V40_SPOTIFY_ICON,disabled:true}
+ ];
+ const recs=[
+  {title:'El Chapo',image:v40SvgData('#1582e8','#fff','EL','CHAPO'),disabled:true},
+  {title:'Beauty & The Beast',image:v40SvgData('#db4ba6','#fff','BEAUTY',''),disabled:true},
+  {title:'Reacher',image:v40SvgData('#ef4444','#fff','REACHER',''),disabled:true},
+  {title:'All Apps',image:V40_ALL_APPS_ICON,action:()=>v40OpenMediaAppPage(V40_MEDIA_APPS.find(x=>x.id==='allmedia'))}
+ ];
+ openPage({title:'Discover',subtitle:'Video · Music',icon:V40_DISCOVER_ICON,returnZone:'home',items:[...services,...recs],renderCustom:v40RenderMediaDiscover});
+}
+function v40RenderMediaAppPage(body,app){
+ const shelf=app?.shelf||[];
+ body.innerHTML=`<div class="v40-media-app-page"><div class="v40-media-app-hero"><div class="v40-media-app-logo"><img src="${app?.image||V40_DISCOVER_ICON}" alt=""></div><div class="v40-media-app-copy"><div class="v40-media-eyebrow">Media app</div><h2>${esc(app?.name||'Media')}</h2><p>${esc(app?.heroText||app?.desc||'')}</p></div></div><div class="v40-media-section-head">Recommended</div><div class="v40-media-rec-row">${shelf.map((x,i)=>`<button class="v40-media-rec ${i===S.pageIndex?'focused':''}" data-i="${i}" type="button"><div class="v40-media-rec-art" style="background-image:url('${x.image||V40_DISCOVER_ICON}')"></div><div class="v40-media-rec-title">${esc(x.title)}</div></button>`).join('')}</div></div>`;
+ body.querySelectorAll('[data-i]').forEach(el=>el.onclick=()=>{S.pageIndex=Number(el.dataset.i);renderPage()});
+}
+function v40OpenMediaAppPage(app){
+ openPage({title:app?.name||'Media',subtitle:app?.desc||'Media app placeholder.',icon:app?.image||V40_DISCOVER_ICON,returnZone:'home',items:(app?.shelf||[]).map(x=>({title:x.title,note:x.note,image:x.image,disabled:true})),renderCustom:(body)=>v40RenderMediaAppPage(body,app)});
+}
+
+const v40ActivateAppBase=activateApp;
+activateApp=function(app){
+ if(app?.action==='media-discover'){selectSound();v40OpenMediaDiscoverPage();return}
+ if(app?.action==='media-app'){selectSound();v40OpenMediaAppPage(app);return}
+ return v40ActivateAppBase(app);
+};
+
+const v40UpdateDebugBase=updateDebug;
+updateDebug=function(...args){const out=v40UpdateDebugBase(...args),d=document.querySelector('#debug');if(d&&!d.classList.contains('hidden')){d.textContent=d.textContent.replace(/^v0\.\d+/m,'v0.40');d.textContent+=`\nhomeSection=${S.homeSection} controlCenter=${v40ControlCenterOpen}`}return out};
+
+
+
+/* ========================================================================== */
+/* v0.41 — bug-fix pass from user feedback                                    */
+/* ========================================================================== */
+window.__dorukstationVersion='0.41';
+document.title='DorukStation — v0.41';
+
+(function(){
+ const V41_SEARCH_ICON='data:image/svg+xml;utf8,'+encodeURIComponent(`
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+   <defs>
+    <linearGradient id="bg" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0%" stop-color="#2f6df6"/>
+      <stop offset="100%" stop-color="#111827"/>
+    </linearGradient>
+   </defs>
+   <rect width="512" height="512" rx="96" fill="url(#bg)"/>
+   <circle cx="220" cy="220" r="92" fill="none" stroke="#fff" stroke-width="34"/>
+   <line x1="288" y1="288" x2="390" y2="390" stroke="#fff" stroke-width="36" stroke-linecap="round"/>
+  </svg>`);
+ try{
+  const bootMode=localStorage.getItem(V26_LAST_UI_MODE_KEY)||S.uiMode||'classic';
+  if(bootMode==='modern'||bootMode==='classic'){S.uiMode=bootMode;v26ApplyUiModeClass();}
+ }catch{}
+ const searchQuick=quickItems.find(q=>q.id==='search');
+ if(searchQuick)searchQuick.image=V41_SEARCH_ICON;
+ const v41ShowUserSelectorBase=showUserSelector;
+ showUserSelector=function(...args){v26ApplyUiModeClass();document.title='DorukStation — v0.41';return v41ShowUserSelectorBase(...args)};
+
+ function v41VisibleQuickIndices(){return quickItems.map((q,i)=>V40_TOP_QUICK_IDS.includes(q.id)?i:-1).filter(i=>i>=0)}
+
+ const v41MoveBase=move;
+ move=function(dx,dy){
+  if(v40CanUseModernHome()&&!S.pageOpen&&!S.appSurface&&!v40ControlCenterOpen&&!S.userSelectOpen&&!S.createChoiceOpen&&!S.createUserOpen){
+   if(S.zone==='home'){
+    if(dy<0){const vis=v41VisibleQuickIndices();S.zone='top';if(vis.length&&!vis.includes(S.quick))S.quick=vis[0];navSound?.();render();return}
+    if(dx){const items=v40CurrentHomeItems();S.app=Math.max(0,Math.min(items.length-1,S.app+dx));navSound?.();render();return}
+   }else if(S.zone==='top'){
+    if(dy>0){S.zone='home';navSound?.();render();return}
+    if(dx){const vis=v41VisibleQuickIndices();if(vis.length){let pos=vis.indexOf(S.quick);if(pos<0)pos=0;pos=Math.max(0,Math.min(vis.length-1,pos+dx));S.quick=vis[pos];navSound?.();render();return}}
+   }
+  }
+  return v41MoveBase(dx,dy);
+ };
+
+ const V41_LIBRARY_STATE={filter:0,area:'sidebar',items:[],modernFilters:[
+  {id:'installed',label:'Installed',pred:item=>item.kind!=='plus'},
+  {id:'collection',label:'Your Collection',pred:item=>item.kind==='game'||item.kind==='imported'},
+  {id:'plus',label:'PlayStation Plus',pred:item=>item.kind==='plus'}
+ ],classicFilters:[
+  {id:'all',label:'All',pred:item=>true},
+  {id:'folders',label:'Folders',pred:item=>item.kind==='folder'},
+  {id:'games',label:'Games',pred:item=>item.kind==='game'||item.kind==='folder'},
+  {id:'applications',label:'Applications',pred:item=>item.kind==='app'||item.kind==='imported'},
+  {id:'purchased',label:'Purchased',pred:item=>item.kind!=='plus'}
+ ]};
+ function v41LibraryFilters(){return v40CanUseModernHome()?V41_LIBRARY_STATE.modernFilters:V41_LIBRARY_STATE.classicFilters}
+ function v41LibraryFilteredItems(){const filters=v41LibraryFilters();const f=filters[Math.max(0,Math.min(filters.length-1,V41_LIBRARY_STATE.filter))]||filters[0];return (V41_LIBRARY_STATE.items||[]).filter(f.pred)}
+ function v41LibraryCount(pred){return (V41_LIBRARY_STATE.items||[]).filter(pred).length}
+ function v41IsLibraryPage(){return S.pageOpen&&document.querySelector('#pageTitle')?.textContent==='Library'&&S.pageCustom===v41RenderLibrary}
+ function v41BuildLibraryItems(){
+  const items=apps.filter(a=>a.id!=='library').map(a=>({
+   title:a.name,
+   note:a.folderGame?'Games folder':a.userAdded?'Imported HTML':'Installed',
+   image:a.image||V40_ALL_APPS_ICON,
+   kind:a.userAdded?'imported':(a.folderGame?'folder':(/dorukcraft|dungeons|flappy/i.test(a.id+' '+a.name)?'game':'app')),
+   action:()=>{while(S.pageOpen)backPage();S.zone='home';S.homeSection='games';const idx=v40GameHomeItems().findIndex(x=>x.id===a.id);S.app=Math.max(0,idx);render()}
+  }));
+  items.push({title:'Add Custom Game',note:'Choose a standalone .html game for this user',image:'assets/skin/add.png',kind:'app',action:()=>window.v55OpenCustomGamePicker?.()});
+  items.push({title:'Games Folder',note:'Manage global game installs and per-game folders',image:'assets/skin/flow/content/library.png',kind:'folder',action:()=>window.v55OpenGamesFolderInfo?.()});
+  items.push({title:'User Folder',note:'Open this user\'s isolated shell and save namespaces',image:'assets/skin/flow/function/profile.png',kind:'folder',action:()=>window.v55OpenUserFolderInfo?.()});
+  items.push({title:'PlayStation Plus',note:'Subscription area placeholder',image:'assets/skin/plus.png',kind:'plus',disabled:true});
+  return items;
+ }
+ function v41LibraryFocusClass(side,index){return V41_LIBRARY_STATE.area===side&&((side==='sidebar'&&V41_LIBRARY_STATE.filter===index)||(side==='grid'&&S.pageIndex===index))?' focused':''}
+ function v41RenderLibrary(body){
+  const items=v41LibraryFilteredItems();
+  if(!items.length)S.pageIndex=0; else S.pageIndex=Math.max(0,Math.min(items.length-1,S.pageIndex));
+  S.pageItems=items;S.pageMode='grid';S.pageCols=v40CanUseModernHome()?5:5;
+  const filters=v41LibraryFilters();
+  if(v40CanUseModernHome()){
+   body.innerHTML=`<div class="v41-library modern"><aside class="v41-library-sidebar"><div class="v41-lib-side-title">Game Library</div><div class="v41-lib-side-note">Browse installed games and applications.</div>${filters.map((f,i)=>`<button class="v41-lib-filter${V41_LIBRARY_STATE.filter===i?' active':''}${v41LibraryFocusClass('sidebar',i)}" data-filter="${i}" type="button">${esc(f.label)}</button>`).join('')}<div class="v41-lib-spacer"></div><button class="v41-lib-filter small" id="v41LibrarySearchBtn" type="button">Search</button><div class="v41-lib-filter small static">Sort: Most Recent</div></aside><div class="v41-library-main"><div class="v41-library-grid">${items.map((x,i)=>`<button class="v41-lib-tile${v41LibraryFocusClass('grid',i)}" data-i="${i}" type="button">${v40PageCover(x.image||V40_ALL_APPS_ICON,x.title,x.note||'')}</button>`).join('')}</div></div></div>`;
+  }else{
+   body.innerHTML=`<div class="v41-library classic"><aside class="v41-classic-sidebar"><div class="v41-classic-heading">Library</div><button class="v41-classic-search" id="v41LibrarySearchBtn" type="button">🔍 Search</button>${filters.map((f,i)=>{let count=''; if(f.id==='all')count=v41LibraryCount(()=>true); else if(f.id==='folders')count=v41LibraryCount(x=>x.kind==='folder'); else if(f.id==='games')count=v41LibraryCount(x=>x.kind==='game'||x.kind==='folder'); else if(f.id==='applications')count=v41LibraryCount(x=>x.kind==='app'||x.kind==='imported'); else if(f.id==='purchased')count=v41LibraryCount(x=>x.kind!=='plus'); return `<button class="v41-classic-cat${V41_LIBRARY_STATE.filter===i?' active':''}${v41LibraryFocusClass('sidebar',i)}" data-filter="${i}" type="button"><span>${esc(f.label)}</span><span>${count}</span></button>`}).join('')}</aside><div class="v41-classic-main"><div class="v41-classic-topbar"><span>Name: A-Z</span></div><div class="v41-classic-grid">${items.map((x,i)=>`<button class="v41-classic-tile${v41LibraryFocusClass('grid',i)}" data-i="${i}" type="button"><div class="v41-classic-thumb" style="background-image:url('${x.image||V40_ALL_APPS_ICON}')"></div><div class="v41-classic-title">${esc(x.title)}</div></button>`).join('')}</div></div></div>`;
+  }
+  body.querySelectorAll('[data-filter]').forEach(el=>el.onclick=()=>{V41_LIBRARY_STATE.area='sidebar';V41_LIBRARY_STATE.filter=Number(el.dataset.filter);S.pageIndex=0;renderPage()});
+  body.querySelectorAll('[data-i]').forEach(el=>el.onclick=()=>{V41_LIBRARY_STATE.area='grid';S.pageIndex=Number(el.dataset.i);activatePage()});
+  body.querySelector('#v41LibrarySearchBtn')?.addEventListener('click',()=>v41OpenSearchPage());
+ }
+ const v41MovePageBase=movePage;
+ movePage=function(dx,dy){
+  if(v41IsLibraryPage()){
+   const items=v41LibraryFilteredItems();
+   if(V41_LIBRARY_STATE.area==='sidebar'){
+    if(dx>0&&items.length){V41_LIBRARY_STATE.area='grid';S.pageIndex=Math.max(0,Math.min(items.length-1,S.pageIndex));navSound?.();renderPage();return}
+    const step=dy||dx;
+    if(step){const filters=v41LibraryFilters();V41_LIBRARY_STATE.filter=Math.max(0,Math.min(filters.length-1,V41_LIBRARY_STATE.filter+step));S.pageIndex=0;navSound?.();renderPage();return}
+    return;
+   }
+   if(dx<0&&(S.pageIndex%S.pageCols===0||items.length===0)){V41_LIBRARY_STATE.area='sidebar';navSound?.();renderPage();return}
+   let delta=S.pageMode==='grid'?(dx||dy*S.pageCols):(dy||dx);if(!delta)return;
+   S.pageIndex=Math.max(0,Math.min(Math.max(0,items.length-1),S.pageIndex+delta));navSound?.();renderPage();return;
+  }
+  return v41MovePageBase(dx,dy);
+ };
+ const v41ActivatePageBase=activatePage;
+ activatePage=function(){if(v41IsLibraryPage()&&V41_LIBRARY_STATE.area==='sidebar'){renderPage();return}return v41ActivatePageBase()};
+ openLibraryPage=function(){V41_LIBRARY_STATE.items=v41BuildLibraryItems();V41_LIBRARY_STATE.filter=0;V41_LIBRARY_STATE.area='sidebar';openPage({title:'Library',subtitle:v40CanUseModernHome()?'Browse installed games and applications.':'Games, applications and purchases.',icon:'assets/skin/flow/content/library.png',returnZone:'home',mode:'grid',cols:5,items:[],renderCustom:v41RenderLibrary});};
+
+ let v41SearchQuery='';
+ function v41SearchEntries(){
+  const gameEntries=v40GameHomeItems().map(a=>({title:a.name,note:'Game / App',image:a.image||V40_ALL_APPS_ICON,action:()=>{while(S.pageOpen)backPage();S.zone='home';S.homeSection='games';S.app=Math.max(0,v40GameHomeItems().findIndex(x=>x.id===a.id));render()}}));
+  const mediaEntries=V40_MEDIA_APPS.map(a=>({title:a.name,note:'Media',image:a.image||V40_DISCOVER_ICON,action:()=>{while(S.pageOpen)backPage();S.zone='home';S.homeSection='media';S.app=Math.max(0,V40_MEDIA_APPS.findIndex(x=>x.id===a.id));render()}}));
+  const extra=[{title:'Settings',note:'System',image:'assets/skin/flow/function/setting.png',action:()=>{while(S.pageOpen)backPage();S.zone='top';const i=quickItems.findIndex(q=>q.id==='settings');if(i>=0)S.quick=i;render();activateQuick('settings')}}];
+  const seen=new Set(),out=[];
+  for(const item of [...gameEntries,...mediaEntries,...extra]){const key=item.title+'|'+item.note;if(seen.has(key))continue;seen.add(key);out.push(item)}
+  return out;
+ }
+ function v41SearchResults(){
+  const q=v41SearchQuery.trim().toLowerCase();
+  const all=v41SearchEntries();
+  if(!q)return all;
+  return all.filter(x=>(x.title+' '+(x.note||'')).toLowerCase().includes(q));
+ }
+ function v41RenderSearchPage(body){
+  const results=v41SearchResults();
+  if(results.length)S.pageIndex=Math.max(0,Math.min(results.length-1,S.pageIndex)); else S.pageIndex=0;
+  S.pageItems=results;S.pageMode='list';S.pageCols=1;
+  body.innerHTML=`<div class="v41-search-page"><label class="v41-search-label" for="v41SearchInput">Search</label><input id="v41SearchInput" class="v41-search-input" type="text" placeholder="Search for apps, games and media" value="${esc(v41SearchQuery)}"><div class="v41-search-count">${results.length} result${results.length===1?'':'s'}</div><div class="v41-search-results">${results.length?results.map((x,i)=>`<button class="v41-search-row${i===S.pageIndex?' focused':''}" data-i="${i}" type="button"><img src="${x.image||V40_SEARCH_ICON}" alt=""><div class="v41-search-copy"><b>${esc(x.title)}</b><span>${esc(x.note||'')}</span></div></button>`).join(''):'<div class="page-empty">No results found.</div>'}</div></div>`;
+  const input=body.querySelector('#v41SearchInput');
+  if(input){input.addEventListener('input',()=>{v41SearchQuery=input.value;S.pageIndex=0;renderPage()});setTimeout(()=>{try{input.focus();input.setSelectionRange(input.value.length,input.value.length)}catch{}},30)}
+  body.querySelectorAll('[data-i]').forEach(el=>el.onclick=()=>{S.pageIndex=Number(el.dataset.i);activatePage()});
+ }
+ function v41OpenSearchPage(){openPage({title:'Search',subtitle:'Search your games, apps and media.',icon:V41_SEARCH_ICON,returnZone:'top',mode:'list',items:v41SearchResults(),renderCustom:v41RenderSearchPage})}
+ const v41ActivateQuickBase=activateQuick;
+ activateQuick=function(id){if(id==='search'){selectSound?.();v41OpenSearchPage();return}return v41ActivateQuickBase(id)};
+
+ const v41RenderQuickBase=renderQuick;
+ renderQuick=function(...args){const out=v41RenderQuickBase(...args);document.title='DorukStation — v0.41';return out};
+ const v41RenderHomeBase=renderHome;
+ renderHome=function(...args){const out=v41RenderHomeBase(...args);document.title='DorukStation — v0.41';return out};
+
+ const v41UpdateDebugBase=updateDebug;
+ updateDebug=function(...args){const out=v41UpdateDebugBase(...args),d=document.querySelector('#debug');if(d&&!d.classList.contains('hidden')){d.textContent=d.textContent.replace(/^v0\.\d+/m,'v0.41')}return out};
+})();
+
+
+/* ========================================================================== */
+/* v0.42 — centered scroll-follow + fully usable search keyboard              */
+/* ========================================================================== */
+window.__dorukstationVersion='0.42';
+document.title='DorukStation — v0.42';
+
+(function(){
+ const V42_SCROLL_CONTAINERS=[
+  '#pageBody','#menuBody','.quick-menu-list','.quick-menu-detail','.share-menu-list',
+  '#avatarCategories','#avatarGrid','.v41-search-results','.v42-search-results'
+ ];
+ let v42ScrollRaf=0;
+ function v42ScrollableAncestor(el){
+  if(!el)return null;
+  for(const selector of V42_SCROLL_CONTAINERS){
+   const c=el.closest?.(selector)||document.querySelector(selector);
+   if(c&&c.contains(el)&&c.scrollHeight>c.clientHeight+2)return c;
+  }
+  let p=el.parentElement;
+  while(p&&p!==document.body){
+   const st=getComputedStyle(p),oy=st.overflowY;
+   if((oy==='auto'||oy==='scroll')&&p.scrollHeight>p.clientHeight+2)return p;
+   p=p.parentElement;
+  }
+  return null;
+ }
+ function v42CenterSelectedNow(){
+  const selectors=[
+   '#pageBody .focused','#menuBody .focused','.quick-menu-list .focused','.quick-menu-detail .focused',
+   '.share-menu-list .focused','#avatarCategories .focused','#avatarGrid .focused',
+   '.v42-search-results .focused','.v41-search-results .focused'
+  ];
+  for(const selector of selectors){
+   const el=document.querySelector(selector);if(!el)continue;
+   const c=v42ScrollableAncestor(el);if(!c)continue;
+   const er=el.getBoundingClientRect(),cr=c.getBoundingClientRect();
+   const desired=c.scrollTop+(er.top-cr.top)-((c.clientHeight-er.height)/2);
+   const max=Math.max(0,c.scrollHeight-c.clientHeight);
+   const top=Math.max(0,Math.min(max,desired));
+   if(Math.abs(c.scrollTop-top)>1)c.scrollTo({top,behavior:S.animation?'smooth':'auto'});
+  }
+ }
+ function v42CenterSelected(){cancelAnimationFrame(v42ScrollRaf);v42ScrollRaf=requestAnimationFrame(()=>requestAnimationFrame(v42CenterSelectedNow))}
+
+ const wrapRender=name=>{
+  const fn=window[name];
+  if(typeof fn!=='function')return;
+  window[name]=function(...args){const out=fn.apply(this,args);v42CenterSelected();return out};
+ };
+ ['renderPage','renderMenu','renderQuickMenu','renderShareMenu','renderAvatarPicker','renderUserSelector','renderCreateChoice','renderCreateUserFocus'].forEach(wrapRender);
+
+ /* Keep the focus tracking resilient even for custom renderers that don't call
+    one of the shell render functions directly. */
+ try{
+  const focusObserver=new MutationObserver(muts=>{if(muts.some(m=>m.type==='attributes'&&m.attributeName==='class'||m.type==='childList'))v42CenterSelected()});
+  focusObserver.observe(document.querySelector('#stage')||document.body,{subtree:true,childList:true,attributes:true,attributeFilter:['class']});
+ }catch{}
+
+ /* Search is intentionally split in two: results on the left, controller/touch
+    keyboard on the right. Physical keyboards can still type directly. */
+ const V42_SEARCH_ICON=quickItems.find(q=>q.id==='search')?.image||V40_SEARCH_ICON;
+ const V42_KB_ROWS=[
+  ['Q','W','E','R','T','Y','U','I','O','P'],
+  ['A','S','D','F','G','H','J','K','L'],
+  ['Z','X','C','V','B','N','M'],
+  ['SPACE','BACKSPACE','CLEAR']
+ ];
+ const V42_KB_KEYS=V42_KB_ROWS.flat();
+ const V42_SEARCH={query:'',area:'keyboard',keyIndex:0,resultIndex:0,results:[]};
+ function v42SearchEntries(){
+  const gameEntries=v40GameHomeItems().map(a=>({title:a.name,note:'Game / App',image:a.image||V40_ALL_APPS_ICON,action:()=>{while(S.pageOpen)backPage();S.zone='home';S.homeSection='games';S.app=Math.max(0,v40GameHomeItems().findIndex(x=>x.id===a.id));render()}}));
+  const mediaEntries=V40_MEDIA_APPS.map(a=>({title:a.name,note:'Media',image:a.image||V40_DISCOVER_ICON,action:()=>{while(S.pageOpen)backPage();S.zone='home';S.homeSection='media';S.app=Math.max(0,V40_MEDIA_APPS.findIndex(x=>x.id===a.id));render()}}));
+  const system=[
+   {title:'Settings',note:'System',image:'assets/skin/flow/function/setting.png',action:()=>{while(S.pageOpen)backPage();S.zone='top';const i=quickItems.findIndex(q=>q.id==='settings');if(i>=0)S.quick=i;render();activateQuick('settings')}},
+   {title:'Library',note:'Games and applications',image:'assets/skin/flow/content/library.png',action:()=>{while(S.pageOpen)backPage();openLibraryPage()}}
+  ];
+  const seen=new Set(),out=[];
+  for(const item of [...gameEntries,...mediaEntries,...system]){const key=(item.title+'|'+item.note).toLowerCase();if(seen.has(key))continue;seen.add(key);out.push(item)}
+  return out;
+ }
+ function v42RefreshSearchResults(){
+  const q=V42_SEARCH.query.trim().toLowerCase(),all=v42SearchEntries();
+  V42_SEARCH.results=q?all.filter(x=>(x.title+' '+(x.note||'')).toLowerCase().includes(q)):all;
+  V42_SEARCH.resultIndex=Math.max(0,Math.min(Math.max(0,V42_SEARCH.results.length-1),V42_SEARCH.resultIndex));
+  S.pageItems=V42_SEARCH.results;S.pageIndex=V42_SEARCH.resultIndex;S.pageMode='list';S.pageCols=1;
+ }
+ function v42KbIndex(row,col){
+  row=Math.max(0,Math.min(V42_KB_ROWS.length-1,row));
+  const r=V42_KB_ROWS[row],c=Math.max(0,Math.min(r.length-1,col));
+  let idx=0;for(let i=0;i<row;i++)idx+=V42_KB_ROWS[i].length;return idx+c;
+ }
+ function v42KbPos(index){
+  let n=index;for(let r=0;r<V42_KB_ROWS.length;r++){if(n<V42_KB_ROWS[r].length)return [r,n];n-=V42_KB_ROWS[r].length}return [0,0]
+ }
+ function v42ApplySearchKey(key){
+  if(key==='SPACE')V42_SEARCH.query+=' ';
+  else if(key==='BACKSPACE')V42_SEARCH.query=V42_SEARCH.query.slice(0,-1);
+  else if(key==='CLEAR')V42_SEARCH.query='';
+  else V42_SEARCH.query+=key.toLowerCase();
+  V42_SEARCH.resultIndex=0;v42RefreshSearchResults();renderPage();
+ }
+ function v42RenderSearch(body){
+  v42RefreshSearchResults();
+  const resultHtml=V42_SEARCH.results.length?V42_SEARCH.results.map((x,i)=>`<button class="v42-search-result${V42_SEARCH.area==='results'&&i===V42_SEARCH.resultIndex?' focused':''}" data-result="${i}" type="button"><img src="${x.image||V42_SEARCH_ICON}" alt=""><div><b>${esc(x.title)}</b><span>${esc(x.note||'')}</span></div></button>`).join(''):'<div class="v42-search-empty">No results found.</div>';
+  let offset=0;
+  const kbHtml=V42_KB_ROWS.map((row,r)=>{const html=row.map((key,c)=>{const idx=offset+c,label=key==='SPACE'?'Space':key==='BACKSPACE'?'⌫':key==='CLEAR'?'Clear':key;return `<button class="v42-kb-key ${key.length>1?'wide':''}${V42_SEARCH.area==='keyboard'&&idx===V42_SEARCH.keyIndex?' focused':''}" data-key-index="${idx}" data-key="${key}" type="button">${label}</button>`}).join('');offset+=row.length;return `<div class="v42-kb-row">${html}</div>`}).join('');
+  body.innerHTML=`<div class="v42-search-layout"><section class="v42-search-left"><label for="v42SearchInput">Search</label><div class="v42-search-entry-wrap"><img src="${V42_SEARCH_ICON}" alt=""><input id="v42SearchInput" value="${esc(V42_SEARCH.query)}" placeholder="Search apps, games and media" autocomplete="off" spellcheck="false"></div><div class="v42-search-meta">${V42_SEARCH.results.length} result${V42_SEARCH.results.length===1?'':'s'}</div><div class="v42-search-results">${resultHtml}</div></section><aside class="v42-search-keyboard"><div class="v42-kb-title">Keyboard</div><div class="v42-kb-hint">D-pad / stick to move · X/A to type</div>${kbHtml}</aside></div>`;
+  const input=body.querySelector('#v42SearchInput');
+  if(input){
+   input.addEventListener('input',()=>{V42_SEARCH.query=input.value;V42_SEARCH.resultIndex=0;v42RefreshSearchResults();const results=body.querySelector('.v42-search-results');if(results){results.innerHTML=V42_SEARCH.results.length?V42_SEARCH.results.map((x,i)=>`<button class="v42-search-result${V42_SEARCH.area==='results'&&i===V42_SEARCH.resultIndex?' focused':''}" data-result="${i}" type="button"><img src="${x.image||V42_SEARCH_ICON}" alt=""><div><b>${esc(x.title)}</b><span>${esc(x.note||'')}</span></div></button>`).join(''):'<div class="v42-search-empty">No results found.</div>';results.querySelectorAll('[data-result]').forEach(el=>el.onclick=()=>{V42_SEARCH.area='results';V42_SEARCH.resultIndex=Number(el.dataset.result);S.pageIndex=V42_SEARCH.resultIndex;renderPage()})}const meta=body.querySelector('.v42-search-meta');if(meta)meta.textContent=`${V42_SEARCH.results.length} result${V42_SEARCH.results.length===1?'':'s'}`});
+   input.addEventListener('focus',()=>{V42_SEARCH.area='input'});
+   input.addEventListener('keydown',ev=>{ev.stopPropagation();if(ev.key==='Escape'){ev.preventDefault();input.blur();V42_SEARCH.area='keyboard';renderPage()}});
+  }
+  body.querySelectorAll('[data-result]').forEach(el=>el.onclick=()=>{V42_SEARCH.area='results';V42_SEARCH.resultIndex=Number(el.dataset.result);S.pageIndex=V42_SEARCH.resultIndex;renderPage()});
+  body.querySelectorAll('[data-key]').forEach(el=>el.onclick=()=>{V42_SEARCH.area='keyboard';V42_SEARCH.keyIndex=Number(el.dataset.keyIndex);v42ApplySearchKey(el.dataset.key)});
+  v42CenterSelected();
+ }
+ function v42IsSearchPage(){return S.pageOpen&&S.pageCustom===v42RenderSearch&&document.querySelector('#pageTitle')?.textContent==='Search'}
+ function v42OpenSearch(){
+  V42_SEARCH.area='keyboard';V42_SEARCH.keyIndex=0;V42_SEARCH.resultIndex=0;v42RefreshSearchResults();
+  openPage({title:'Search',subtitle:'Find installed games, apps, media and system pages.',icon:V42_SEARCH_ICON,returnZone:'top',mode:'list',items:V42_SEARCH.results,renderCustom:v42RenderSearch});
+ }
+ function v42MoveSearch(dx,dy){
+  if(V42_SEARCH.area==='input'){
+   if(dx>0||dy>0){V42_SEARCH.area='keyboard';navSound?.();renderPage();return}
+   if(dy<0){return}
+  }
+  if(V42_SEARCH.area==='results'){
+   if(dx>0){V42_SEARCH.area='keyboard';navSound?.();renderPage();return}
+   if(dy&&V42_SEARCH.results.length){V42_SEARCH.resultIndex=Math.max(0,Math.min(V42_SEARCH.results.length-1,V42_SEARCH.resultIndex+dy));S.pageIndex=V42_SEARCH.resultIndex;navSound?.();renderPage();return}
+   return;
+  }
+  let [r,c]=v42KbPos(V42_SEARCH.keyIndex);
+  if(dx<0&&c===0){V42_SEARCH.area='results';V42_SEARCH.resultIndex=Math.max(0,Math.min(V42_SEARCH.results.length-1,V42_SEARCH.resultIndex));S.pageIndex=V42_SEARCH.resultIndex;navSound?.();renderPage();return}
+  if(dx) c=Math.max(0,Math.min(V42_KB_ROWS[r].length-1,c+dx));
+  if(dy){const nr=Math.max(0,Math.min(V42_KB_ROWS.length-1,r+dy));const ratio=V42_KB_ROWS[r].length<=1?0:c/Math.max(1,V42_KB_ROWS[r].length-1);r=nr;c=Math.round(ratio*Math.max(0,V42_KB_ROWS[r].length-1));}
+  V42_SEARCH.keyIndex=v42KbIndex(r,c);navSound?.();renderPage();
+ }
+ function v42ActivateSearch(){
+  if(V42_SEARCH.area==='results'){const item=V42_SEARCH.results[V42_SEARCH.resultIndex];if(item&&!item.disabled){selectSound?.();item.action?.()}return}
+  if(V42_SEARCH.area==='input'){V42_SEARCH.area='keyboard';renderPage();return}
+  const key=V42_KB_KEYS[V42_SEARCH.keyIndex];if(key){selectSound?.();v42ApplySearchKey(key)}
+ }
+
+ const v42MovePageBase=movePage;
+ movePage=function(dx,dy){if(v42IsSearchPage())return v42MoveSearch(dx,dy);const out=v42MovePageBase(dx,dy);v42CenterSelected();return out};
+ const v42ActivatePageBase=activatePage;
+ activatePage=function(){if(v42IsSearchPage())return v42ActivateSearch();return v42ActivatePageBase()};
+ const v42ActivateQuickBase=activateQuick;
+ activateQuick=function(id){if(id==='search'){selectSound?.();v42OpenSearch();return}return v42ActivateQuickBase(id)};
+
+ /* Physical typing should work without DorukStation swallowing the text. */
+ document.addEventListener('keydown',ev=>{
+  if(!v42IsSearchPage())return;
+  const input=document.querySelector('#v42SearchInput');
+  if(document.activeElement===input){
+   if(ev.key==='Escape'){ev.preventDefault();input.blur();V42_SEARCH.area='keyboard';renderPage()}
+   return;
+  }
+  if(ev.key.length===1&&!ev.ctrlKey&&!ev.metaKey&&!ev.altKey){ev.preventDefault();ev.stopImmediatePropagation();V42_SEARCH.query+=ev.key;V42_SEARCH.resultIndex=0;v42RefreshSearchResults();renderPage();return}
+  if(ev.key==='Backspace'&&V42_SEARCH.area==='keyboard'){ev.preventDefault();ev.stopImmediatePropagation();v42ApplySearchKey('BACKSPACE')}
+ },true);
+
+ const v42UpdateDebugBase=updateDebug;
+ updateDebug=function(...args){const out=v42UpdateDebugBase(...args),d=document.querySelector('#debug');if(d&&!d.classList.contains('hidden'))d.textContent=d.textContent.replace(/^v0\.\d+/m,'v0.42');return out};
+})();
+
+
+/* ========================================================================== */
+/* v0.43 — mode-switch cleanup + Modern atmosphere refinement                 */
+/* Visual behavior is original; InitialDin/ps5-menu-es-de was used only as   */
+/* a structural reference for layered PS5-style background/media treatment.   */
+/* ========================================================================== */
+window.__dorukstationVersion='0.43';
+document.title='DorukStation — v0.43';
+
+(function(){
+ let v43Canvas=null,v43Ctx=null,v43Frame=0,v43Last=0,v43W=0,v43H=0,v43Dpr=1;
+ let v43Dust=[],v43Glints=[],v43Ribbons=[];
+
+ function v43Rand(seed){
+  let x=(seed*1664525+1013904223)>>>0;
+  x^=x<<13;x^=x>>>17;x^=x<<5;
+  return (x>>>0)/4294967295;
+ }
+ function v43BuildScene(){
+  v43Dust=Array.from({length:88},(_,i)=>({
+   x:v43Rand(i*17+3),y:v43Rand(i*17+5),z:.18+v43Rand(i*17+7)*.82,
+   r:.55+v43Rand(i*17+9)*1.9,phase:v43Rand(i*17+11)*Math.PI*2,
+   speed:.018+v43Rand(i*17+13)*.035,drift:(v43Rand(i*17+15)-.5)*.035,
+   blue:v43Rand(i*17+16)>.62
+  }));
+  v43Glints=Array.from({length:18},(_,i)=>({
+   x:v43Rand(900+i*31),y:v43Rand(903+i*31),phase:v43Rand(906+i*31)*Math.PI*2,
+   speed:.12+v43Rand(909+i*31)*.19,size:1.5+v43Rand(912+i*31)*2.6,
+   blue:v43Rand(915+i*31)>.48
+  }));
+  v43Ribbons=Array.from({length:4},(_,i)=>({
+   phase:v43Rand(1500+i*7)*Math.PI*2,
+   speed:.018+v43Rand(1502+i*7)*.016,
+   y:.25+i*.13,
+   amp:.055+v43Rand(1504+i*7)*.055,
+   width:1.2+i*.75,
+   alpha:.035+i*.012
+  }));
+ }
+ function v43EnsureCanvas(){
+  const host=document.querySelector('#modernGlitter');if(!host)return;
+  if(!v43Canvas){
+   host.innerHTML='';
+   v43Canvas=document.createElement('canvas');
+   v43Canvas.id='v43ModernAtmosphere';v43Canvas.setAttribute('aria-hidden','true');
+   host.appendChild(v43Canvas);v43Ctx=v43Canvas.getContext('2d',{alpha:true});
+   v43BuildScene();
+  }
+  v43ResizeCanvas();
+ }
+ function v43ResizeCanvas(){
+  if(!v43Canvas)return;
+  const r=v43Canvas.getBoundingClientRect(),d=Math.min(1.5,window.devicePixelRatio||1);
+  const w=Math.max(2,Math.round(r.width*d)),h=Math.max(2,Math.round(r.height*d));
+  if(w===v43Canvas.width&&h===v43Canvas.height)return;
+  v43Canvas.width=w;v43Canvas.height=h;v43Dpr=d;v43W=w/d;v43H=h/d;
+ }
+ function v43Ribbon(ctx,t,r,i){
+  const y=v43H*(r.y+Math.sin(t*r.speed+r.phase)*.035);
+  const amp=v43H*r.amp;
+  ctx.save();ctx.globalCompositeOperation='screen';ctx.lineCap='round';ctx.lineJoin='round';
+  const grad=ctx.createLinearGradient(v43W*.05,y,v43W*.95,y);
+  grad.addColorStop(0,'rgba(70,120,255,0)');
+  grad.addColorStop(.28,`rgba(95,157,255,${r.alpha*.7})`);
+  grad.addColorStop(.58,`rgba(205,232,255,${r.alpha})`);
+  grad.addColorStop(.78,`rgba(97,177,255,${r.alpha*.75})`);
+  grad.addColorStop(1,'rgba(70,120,255,0)');
+  ctx.strokeStyle=grad;ctx.lineWidth=r.width*v43Dpr;ctx.shadowBlur=16+12*i;ctx.shadowColor='rgba(100,175,255,.18)';
+  ctx.beginPath();
+  const x0=-v43W*.05;
+  ctx.moveTo(x0,y);
+  ctx.bezierCurveTo(v43W*.22,y-amp,v43W*.42,y+amp*1.35,v43W*.62,y-amp*.35);
+  ctx.bezierCurveTo(v43W*.78,y-amp*.9,v43W*.92,y+amp*.55,v43W*1.08,y-amp*.15);
+  ctx.stroke();ctx.restore();
+ }
+ function v43DrawDust(ctx,t){
+  ctx.save();ctx.globalCompositeOperation='screen';
+  for(const p of v43Dust){
+   const x=((p.x+t*p.speed*.012+p.drift*Math.sin(t*.017+p.phase))%1.14+1.14)%1.14-.07;
+   const y=p.y+Math.sin(t*.021*p.speed*40+p.phase)*(.012+.018*p.z);
+   const px=x*v43W,py=y*v43H;
+   const pulse=.18+.82*(.5+.5*Math.sin(t*(.45+p.speed*5)+p.phase));
+   const alpha=(.055+.18*p.z)*pulse;
+   const size=p.r*(.65+p.z*.85);
+   ctx.fillStyle=p.blue?`rgba(135,198,255,${alpha})`:`rgba(255,255,255,${alpha})`;
+   ctx.shadowBlur=4+8*p.z;ctx.shadowColor=p.blue?'rgba(100,172,255,.42)':'rgba(255,255,255,.28)';
+   ctx.beginPath();ctx.arc(px,py,size,0,Math.PI*2);ctx.fill();
+  }
+  ctx.restore();
+ }
+ function v43DrawGlints(ctx,t){
+  ctx.save();ctx.globalCompositeOperation='screen';ctx.lineCap='round';
+  for(const g of v43Glints){
+   const pulse=Math.max(0,Math.sin(t*g.speed+g.phase));
+   if(pulse<.72)continue;
+   const a=(pulse-.72)/.28;
+   const x=g.x*v43W,y=g.y*v43H,s=g.size*(.8+a*1.7);
+   ctx.strokeStyle=g.blue?`rgba(160,214,255,${.22+a*.58})`:`rgba(255,255,255,${.22+a*.68})`;
+   ctx.lineWidth=.7;ctx.shadowBlur=12;ctx.shadowColor=g.blue?'rgba(87,169,255,.65)':'rgba(255,255,255,.55)';
+   ctx.beginPath();ctx.moveTo(x-s*3,y);ctx.lineTo(x+s*3,y);ctx.moveTo(x,y-s*3);ctx.lineTo(x,y+s*3);ctx.stroke();
+  }
+  ctx.restore();
+ }
+ function v43DrawBloom(ctx,t){
+  const x=v43W*(.66+.035*Math.sin(t*.09)),y=v43H*(.30+.025*Math.cos(t*.07));
+  const r=Math.max(v43W,v43H)*.38;
+  const g=ctx.createRadialGradient(x,y,0,x,y,r);
+  g.addColorStop(0,'rgba(76,145,255,.065)');g.addColorStop(.38,'rgba(38,105,215,.035)');g.addColorStop(1,'rgba(0,0,0,0)');
+  ctx.fillStyle=g;ctx.fillRect(0,0,v43W,v43H);
+ }
+ function v43Draw(now){
+  if(!v43Ctx||!v43Canvas)return;
+  const modern=document.body.classList.contains('ui-modern');
+  const animate=!document.body.classList.contains('no-animation');
+  if(!modern){v43Ctx.clearRect(0,0,v43W,v43H);v43Frame=requestAnimationFrame(v43Draw);return}
+  v43ResizeCanvas();
+  const t=animate?now/1000:12.5;
+  const ctx=v43Ctx;ctx.setTransform(v43Dpr,0,0,v43Dpr,0,0);ctx.clearRect(0,0,v43W,v43H);
+  v43DrawBloom(ctx,t);
+  for(let i=0;i<v43Ribbons.length;i++)v43Ribbon(ctx,t,v43Ribbons[i],i);
+  v43DrawDust(ctx,t);v43DrawGlints(ctx,t);
+  if(document.body.classList.contains('game-banner-active'))ctx.globalAlpha=.58;else ctx.globalAlpha=1;
+  v43Last=now;v43Frame=requestAnimationFrame(v43Draw);
+ }
+ function v43StartAtmosphere(){
+  v43EnsureCanvas();
+  if(!v43Frame)v43Frame=requestAnimationFrame(v43Draw);
+ }
+
+ function v43CleanModeLeaks(){
+  const modern=document.body.classList.contains('ui-modern');
+  const ids=['v40HomeTabs','v40HeroPanel','v40Shelf','v40ControlCenter'];
+  for(const id of ids){const el=document.getElementById(id);if(!el)continue;el.setAttribute('aria-hidden',modern?'false':'true')}
+  if(!modern){
+   try{if(typeof v40ControlCenterOpen!=='undefined'&&v40ControlCenterOpen)v40CloseControlCenter(false)}catch{}
+   document.body.classList.remove('v40-home-media','v40-control-open');
+  }
+ }
+
+ const v43ApplyUiModeClassBase=v26ApplyUiModeClass;
+ v26ApplyUiModeClass=function(...args){const out=v43ApplyUiModeClassBase(...args);requestAnimationFrame(()=>{v43CleanModeLeaks();v43StartAtmosphere()});return out};
+ const v43SetUiModeBase=v26SetUiMode;
+ v26SetUiMode=function(...args){const out=v43SetUiModeBase(...args);requestAnimationFrame(()=>{v43CleanModeLeaks();v43StartAtmosphere();render?.()});return out};
+ const v43RenderBase=render;
+ render=function(...args){const out=v43RenderBase(...args);requestAnimationFrame(v43CleanModeLeaks);return out};
+
+ window.addEventListener('resize',()=>v43ResizeCanvas(),{passive:true});
+ document.addEventListener('visibilitychange',()=>{if(!document.hidden)v43StartAtmosphere()});
+ v43StartAtmosphere();v43CleanModeLeaks();
+
+ const v43UpdateDebugBase=updateDebug;
+ updateDebug=function(...args){const out=v43UpdateDebugBase(...args),d=document.querySelector('#debug');if(d&&!d.classList.contains('hidden')){d.textContent=d.textContent.replace(/^v0\.\d+/m,'v0.43');d.textContent+='\nmodernAtmosphere=canvas-v43'}return out};
+})();
+
+
+/* ========================================================================== */
+/* v0.44 — real glitter pass: dense twinkling particles, no crosses/ribbons   */
+/* ========================================================================== */
+window.__dorukstationVersion='0.44';
+document.title='DorukStation — v0.44';
+(function(){
+ const host=document.querySelector('#modernGlitter');
+ if(!host)return;
+ function rand(seed){let x=(seed*1664525+1013904223)>>>0;x^=x<<13;x^=x>>>17;x^=x<<5;return (x>>>0)/4294967295}
+ function build(){
+  host.innerHTML='';
+  const frag=document.createDocumentFragment();
+  for(let i=0;i<220;i++){
+   const p=document.createElement('i');
+   p.className='v44-glitter'+(i%7===0?' blue':'')+(i%23===0?' bright':'')+(i%41===0?' soft':'');
+   p.style.setProperty('--x',(rand(i*13+1)*100).toFixed(3)+'%');
+   p.style.setProperty('--y',(rand(i*13+2)*100).toFixed(3)+'%');
+   p.style.setProperty('--s',(0.65+rand(i*13+3)*2.55).toFixed(2)+'px');
+   p.style.setProperty('--a',(0.15+rand(i*13+4)*0.68).toFixed(3));
+   p.style.setProperty('--d',(2.2+rand(i*13+5)*6.8).toFixed(2)+'s');
+   p.style.setProperty('--delay',(-rand(i*13+6)*8.0).toFixed(2)+'s');
+   p.style.setProperty('--dx',((rand(i*13+7)-.5)*16).toFixed(2)+'px');
+   p.style.setProperty('--dy',((rand(i*13+8)-.5)*12).toFixed(2)+'px');
+   frag.appendChild(p);
+  }
+  for(let i=0;i<4;i++){
+   const h=document.createElement('b');h.className='v44-haze';
+   h.style.setProperty('--hx',(12+rand(900+i*5)*76).toFixed(2)+'%');
+   h.style.setProperty('--hy',(12+rand(901+i*5)*68).toFixed(2)+'%');
+   h.style.setProperty('--hs',(240+rand(902+i*5)*320).toFixed(0)+'px');
+   h.style.setProperty('--hd',(13+rand(903+i*5)*16).toFixed(1)+'s');
+   h.style.setProperty('--hdelay',(-rand(904+i*5)*14).toFixed(1)+'s');
+   frag.appendChild(h);
+  }
+  host.appendChild(frag);
+ }
+ build();
+ const v44ApplyBase=v26ApplyUiModeClass;
+ v26ApplyUiModeClass=function(...args){const out=v44ApplyBase(...args);requestAnimationFrame(()=>{if(document.body.classList.contains('ui-modern')&&!host.querySelector('.v44-glitter'))build()});return out};
+ const v44SetBase=v26SetUiMode;
+ v26SetUiMode=function(...args){const out=v44SetBase(...args);requestAnimationFrame(()=>{if(document.body.classList.contains('ui-modern'))build()});return out};
+ const v44DebugBase=updateDebug;
+ updateDebug=function(...args){const out=v44DebugBase(...args),d=document.querySelector('#debug');if(d&&!d.classList.contains('hidden')){d.textContent=d.textContent.replace(/^v0\.\d+/m,'v0.44');d.textContent+='\nmodernGlitter=particles-v44'}return out};
+})();
+
+
+/* ========================================================================== */
+/* v0.45 — denser warm PS5-inspired glitter field                            */
+/* ========================================================================== */
+window.__dorukstationVersion='0.46';
+document.title='DorukStation — v0.46';
+(function(){
+ const host=document.querySelector('#modernGlitter');
+ if(!host)return;
+ function rand(seed){let x=(seed*1103515245+12345)>>>0;x^=x<<13;x^=x>>>17;x^=x<<5;return (x>>>0)/4294967295}
+ function bell(seedA,seedB){return (rand(seedA)+rand(seedB)+rand(seedA+71)+rand(seedB+103))/4}
+ function build45(){
+  host.innerHTML='';
+  const frag=document.createDocumentFragment();
+  /* Sparse depth field across the full screen. */
+  for(let i=0;i<180;i++){
+   const p=document.createElement('i');
+   const r=rand(i*19+3), warm=r<.72, blue=r>.94;
+   p.className='v45-glitter sparse'+(warm?' gold':'')+(blue?' blue':'')+(i%29===0?' bright':'');
+   p.style.setProperty('--x',(rand(i*19+4)*100).toFixed(3)+'%');
+   p.style.setProperty('--y',(rand(i*19+5)*100).toFixed(3)+'%');
+   p.style.setProperty('--s',(0.95+rand(i*19+6)*4.15).toFixed(2)+'px');
+   p.style.setProperty('--a',(0.18+rand(i*19+7)*0.68).toFixed(3));
+   p.style.setProperty('--d',(2.8+rand(i*19+8)*7.4).toFixed(2)+'s');
+   p.style.setProperty('--delay',(-rand(i*19+9)*9.5).toFixed(2)+'s');
+   p.style.setProperty('--dx',((rand(i*19+10)-.5)*18).toFixed(2)+'px');
+   p.style.setProperty('--dy',((rand(i*19+11)-.5)*13).toFixed(2)+'px');
+   frag.appendChild(p);
+  }
+  /* Main glitter cloud. Biased slightly below centre, like a luminous dust bank. */
+  for(let i=0;i<420;i++){
+   const p=document.createElement('i');
+   const r=rand(7000+i*23+1), warm=r<.88, blue=r>.975;
+   const bright=rand(7000+i*23+2)>.90;
+   const bokeh=rand(7000+i*23+3)>.965;
+   p.className='v45-glitter cloud'+(warm?' gold':'')+(blue?' blue':'')+(bright?' bright':'')+(bokeh?' bokeh':'');
+   const x=rand(7000+i*23+4)*100;
+   /* Bell distribution centred around 64%, with a small upward tail. */
+   const y=Math.max(35,Math.min(91,44+bell(7000+i*23+5,7000+i*23+6)*40+rand(7000+i*23+7)*5));
+   p.style.setProperty('--x',x.toFixed(3)+'%');
+   p.style.setProperty('--y',y.toFixed(3)+'%');
+   const size=bokeh?(6.4+rand(7000+i*23+8)*7.1):(bright?(3.2+rand(7000+i*23+8)*5.0):(1.15+rand(7000+i*23+8)*4.25));
+   p.style.setProperty('--s',size.toFixed(2)+'px');
+   p.style.setProperty('--a',(0.28+rand(7000+i*23+9)*0.70).toFixed(3));
+   p.style.setProperty('--d',(2.1+rand(7000+i*23+10)*6.2).toFixed(2)+'s');
+   p.style.setProperty('--delay',(-rand(7000+i*23+11)*8.8).toFixed(2)+'s');
+   p.style.setProperty('--dx',((rand(7000+i*23+12)-.5)*14).toFixed(2)+'px');
+   p.style.setProperty('--dy',((rand(7000+i*23+13)-.5)*10).toFixed(2)+'px');
+   frag.appendChild(p);
+  }
+  /* Soft golden depth orbs around the lower-middle cloud. */
+  for(let i=0;i<18;i++){
+   const b=document.createElement('b');
+   b.className='v45-depth-orb'+(i%6===0?' cool':'');
+   b.style.setProperty('--ox',(6+rand(12000+i*7)*88).toFixed(2)+'%');
+   b.style.setProperty('--oy',(48+rand(12001+i*7)*34).toFixed(2)+'%');
+   b.style.setProperty('--os',(8+rand(12002+i*7)*26).toFixed(1)+'px');
+   b.style.setProperty('--oa',(0.06+rand(12003+i*7)*0.19).toFixed(3));
+   b.style.setProperty('--od',(5+rand(12004+i*7)*10).toFixed(1)+'s');
+   b.style.setProperty('--odelay',(-rand(12005+i*7)*10).toFixed(1)+'s');
+   frag.appendChild(b);
+  }
+  host.appendChild(frag);
+ }
+ build45();
+ const applyBase=v26ApplyUiModeClass;
+ v26ApplyUiModeClass=function(...args){const out=applyBase(...args);requestAnimationFrame(()=>{if(document.body.classList.contains('ui-modern')&&!host.querySelector('.v45-glitter'))build45()});return out};
+ const setBase=v26SetUiMode;
+ v26SetUiMode=function(...args){const out=setBase(...args);requestAnimationFrame(()=>{if(document.body.classList.contains('ui-modern'))build45()});return out};
+ const debugBase=updateDebug;
+ updateDebug=function(...args){const out=debugBase(...args),d=document.querySelector('#debug');if(d&&!d.classList.contains('hidden')){d.textContent=d.textContent.replace(/^v0\.\d+/m,'v0.46');d.textContent+='\nmodernGlitter=warm-cloud-v46-login-gate'}return out};
+})();
+
+
+/* ========================================================================== */
+/* v0.49 — restored lightweight DOM glitter with varied size and speed        */
+/* ========================================================================== */
+window.__dorukstationVersion='0.49';
+document.title='DorukStation — v0.49';
+(function(){
+ const host=document.querySelector('#modernGlitter');
+ if(!host)return;
+ let seed=0x49D05A;
+ function rnd(){seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed/4294967296}
+ function clamp(v,a,b){return Math.max(a,Math.min(b,v))}
+ function makeParticle(i,cloud){
+  const p=document.createElement('i');
+  const warm=rnd()<.84,blue=!warm&&rnd()<.24,big=rnd()<.075,soft=!big&&rnd()<.07;
+  p.className='v49-glitter'+(warm?' gold':'')+(blue?' blue':'')+(big?' big':'')+(soft?' soft':'');
+  const x=rnd()*100;
+  /* Keep part of the old even field, but give the lower-middle a gentle
+     concentration without multiplying the total particle count. */
+  const y=cloud?clamp(43+((rnd()+rnd()+rnd())/3)*38+(rnd()-.5)*8,34,88):rnd()*100;
+  let s=.65+rnd()*2.25;
+  if(big)s=2.8+rnd()*2.8;
+  p.style.setProperty('--x',x.toFixed(3)+'%');
+  p.style.setProperty('--y',y.toFixed(3)+'%');
+  p.style.setProperty('--s',s.toFixed(2)+'px');
+  p.style.setProperty('--a',(0.18+rnd()*.62).toFixed(3));
+  /* Wide duration range = visibly different speeds, all slower than v0.47. */
+  p.style.setProperty('--d',(7.0+rnd()*16.0).toFixed(2)+'s');
+  p.style.setProperty('--delay',(-rnd()*20).toFixed(2)+'s');
+  p.style.setProperty('--dx',((rnd()-.5)*(big?11:7)).toFixed(2)+'px');
+  p.style.setProperty('--dy',(-(1+rnd()*(big?7:4))).toFixed(2)+'px');
+  p.style.setProperty('--phase',(rnd()*1).toFixed(3));
+  return p;
+ }
+ function build(){
+  host.innerHTML='';seed=0x49D05A;
+  const frag=document.createDocumentFragment();
+  /* Hidden compatibility sentinel prevents the older v0.34/v0.44/v0.45
+     rebuild hooks from repopulating their superseded glitter systems. */
+  const sentinel=document.createElement('i');
+  sentinel.className='v34-glitter v44-glitter v45-glitter v49-sentinel';
+  sentinel.hidden=true;frag.appendChild(sentinel);
+
+  /* Exactly the old v0.44 particle count: 220 total. */
+  const total=220,cloudCount=88;
+  for(let i=0;i<total;i++)frag.appendChild(makeParticle(i,i<cloudCount));
+  host.appendChild(frag);
+ }
+ build();
+ const applyBase=v26ApplyUiModeClass;
+ v26ApplyUiModeClass=function(...args){const out=applyBase(...args);requestAnimationFrame(()=>{if(document.body.classList.contains('ui-modern')&&!host.querySelector('.v49-glitter'))build()});return out};
+ const setBase=v26SetUiMode;
+ v26SetUiMode=function(...args){const out=setBase(...args);requestAnimationFrame(()=>{if(document.body.classList.contains('ui-modern')&&!host.querySelector('.v49-glitter'))build()});return out};
+ const debugBase=updateDebug;
+ updateDebug=function(...args){const out=debugBase(...args),d=document.querySelector('#debug');if(d&&!d.classList.contains('hidden')){d.textContent=d.textContent.replace(/^v0\.\d+/m,'v0.49');d.textContent+='\nmodernGlitter=dom-v49 particles=220'}return out};
+})();
+
+
+/* ========================================================================== */
+/* v0.50 — final lightweight glitter distribution + close-app input guard     */
+/* ========================================================================== */
+window.__dorukstationVersion='0.50';
+document.title='DorukStation — v0.50';
+(function(){
+ const host=document.querySelector('#modernGlitter');
+ if(!host)return;
+ let seed=0x50D05A;
+ function rnd(){seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed/4294967296}
+ function clamp(v,a,b){return Math.max(a,Math.min(b,v))}
+ function makeParticle(i,inCloud){
+  const p=document.createElement('i');
+  const warm=rnd()<.84,blue=!warm&&rnd()<.24,big=rnd()<.075,soft=!big&&rnd()<.07;
+  p.className='v50-glitter'+(warm?' gold':'')+(blue?' blue':'')+(big?' big':'')+(soft?' soft':'');
+  /* 95% live in a compact band just below screen centre.  The triangular
+     distribution keeps the field naturally densest near the middle of it. */
+  const x=inCloud?clamp(7+((rnd()+rnd())*.5)*86+(rnd()-.5)*5,2,98):rnd()*100;
+  const y=inCloud?clamp(52+((rnd()+rnd()+rnd())/3)*27+(rnd()-.5)*5,48,82):rnd()*100;
+  /* v0.49 base sizes, exactly 3x larger as requested. */
+  let s=(.65+rnd()*2.25)*3;
+  if(big)s=(2.8+rnd()*2.8)*3;
+  p.style.setProperty('--x',x.toFixed(3)+'%');
+  p.style.setProperty('--y',y.toFixed(3)+'%');
+  p.style.setProperty('--s',s.toFixed(2)+'px');
+  p.style.setProperty('--a',(0.18+rnd()*.62).toFixed(3));
+  /* Keep the varied, deliberately slow v0.49 timing. */
+  p.style.setProperty('--d',(7.0+rnd()*16.0).toFixed(2)+'s');
+  p.style.setProperty('--delay',(-rnd()*20).toFixed(2)+'s');
+  p.style.setProperty('--dx',((rnd()-.5)*(big?11:7)).toFixed(2)+'px');
+  p.style.setProperty('--dy',(-(1+rnd()*(big?7:4))).toFixed(2)+'px');
+  return p;
+ }
+ function build(){
+  host.innerHTML='';seed=0x50D05A;
+  const frag=document.createDocumentFragment();
+  /* Stop superseded glitter hooks from rebuilding their own particle fields. */
+  const sentinel=document.createElement('i');
+  sentinel.className='v34-glitter v44-glitter v45-glitter v49-glitter v50-sentinel';
+  sentinel.hidden=true;frag.appendChild(sentinel);
+  /* Normal baseline is 220. v0.50 permanently uses +20% = 264 particles. */
+  const total=264,cloudCount=251; // 95.1% cloud, 4.9% elsewhere
+  for(let i=0;i<total;i++)frag.appendChild(makeParticle(i,i<cloudCount));
+  host.appendChild(frag);
+ }
+ build();
+ const applyBase=v26ApplyUiModeClass;
+ v26ApplyUiModeClass=function(...args){const out=applyBase(...args);requestAnimationFrame(()=>{if(document.body.classList.contains('ui-modern')&&!host.querySelector('.v50-glitter'))build()});return out};
+ const setBase=v26SetUiMode;
+ v26SetUiMode=function(...args){const out=setBase(...args);requestAnimationFrame(()=>{if(document.body.classList.contains('ui-modern')&&!host.querySelector('.v50-glitter'))build()});return out};
+ const debugBase=updateDebug;
+ updateDebug=function(...args){const out=debugBase(...args),d=document.querySelector('#debug');if(d&&!d.classList.contains('hidden')){d.textContent=d.textContent.replace(/^v0\.\d+/m,'v0.50');d.textContent+='\nmodernGlitter=dom-v50 particles=264 cloud=251 size=3x'}return out};
+})();
+
+/* Destructive app-close guard. A controller/touch activation that selected
+   "Close background app" must not fall through and relaunch that same tile. */
+let v50SuppressActivationUntil=0;
+const v50CloseRunningAppBase=closeRunningApp;
+closeRunningApp=function(id){
+ v50SuppressActivationUntil=Math.max(v50SuppressActivationUntil,performance.now()+700);
+ return v50CloseRunningAppBase(id);
+};
+const v50ActivateBase=activate;
+activate=function(...args){
+ if(performance.now()<v50SuppressActivationUntil)return;
+ return v50ActivateBase(...args);
+};
+const v50ActivateAppBase=activateApp;
+activateApp=function(app){
+ if(performance.now()<v50SuppressActivationUntil)return;
+ return v50ActivateAppBase(app);
+};
+/* Close the options panel before destroying the browsing context. This also
+   prevents its exit animation from leaving a clickable layer over Home. */
+const v50OptionsBase=options;
+options=function(){
+ if(S.switcher){closeSwitcher();return}
+ if(S.appSurface)return;
+ if(S.pageOpen||S.zone!=="home")return;
+ const app=apps[S.app],running=runningApps.has(app.id);
+ v28PlayEvent("optionOpen");
+ openAppMenu(app.name,[
+   {label:running?"Resume":"Start",action:()=>{closeMenu();activateApp(app)}},
+   {label:"Information",note:app.userAdded?"Local app":"System app",action:()=>showAppInformation(app)},
+   {label:app.inFolder?"Remove from Games folder":"Add to Games folder",action:()=>{app.inFolder=!app.inFolder;v18SaveFolderPrefs?.();closeMenu();render()}},
+   {sep:true},
+   {label:"Close background app",disabled:!running,action:()=>{
+      v50SuppressActivationUntil=performance.now()+700;
+      closeMenu(false);
+      closeRunningApp(app.id);
+      S.zone="home";
+      render();
+   }},
+   {label:"Delete",disabled:!app.userAdded,action:()=>removeUserApp(app)}
+ ]);
+};
+
+/* ========================================================================== */
+/* v0.52 — wider lower-middle glitter bank, preserving lightweight motion      */
+/* ========================================================================== */
+window.__dorukstationVersion='0.52';
+document.title='DorukStation — v0.52';
+(function(){
+ const host=document.querySelector('#modernGlitter');
+ if(!host)return;
+ let seed=0x51D05A;
+ function rnd(){seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed/4294967296}
+ function clamp(v,a,b){return Math.max(a,Math.min(b,v))}
+ function makeParticle(i,inCloud){
+  const p=document.createElement('i');
+  const warm=rnd()<.84,blue=!warm&&rnd()<.24,big=rnd()<.075,soft=!big&&rnd()<.07;
+  p.className='v51-glitter'+(warm?' gold':'')+(blue?' blue':'')+(big?' big':'')+(soft?' soft':'');
+
+  /* v0.52: keep 95% of particles in the lower-middle bank, but widen the
+     bank so the glow reaches almost the full screen width and more of the
+     lower half. A low-discrepancy spread avoids obvious empty patches while
+     keeping small seeded jitter so it still looks organic instead of gridded. */
+  let x,y;
+  if(inCloud){
+   const u=(i*.61803398875 + rnd()*.17)%1;
+   const v=(i*.41421356237 + rnd()*.21)%1;
+   x=clamp(1.5 + u*97 + (rnd()-.5)*3.4, .5, 99.5);
+   /* Wider vertical band: approx 46–91%, with a mild centre bias around 68%. */
+   const vb=(v + ((rnd()+rnd())*.5))*.5;
+   y=clamp(46 + vb*45 + (rnd()-.5)*3.8, 44.5, 92.5);
+  }else{
+   x=rnd()*100;
+   y=rnd()*100;
+  }
+
+  /* Keep v0.50's 3x particle sizing. */
+  let s=(.65+rnd()*2.25)*3;
+  if(big)s=(2.8+rnd()*2.8)*3;
+
+  /* PS5-style motion is a slow shifting/swirl rather than a tiny vertical
+     nudge.  We use a curved transform-only orbit around each spawn point:
+     no per-frame JavaScript, so it stays much cheaper than the old canvas. */
+  const side=rnd()<.5?-1:1;
+  const depth=big?1.18+rnd()*.38:.48+rnd()*.72;
+  const span=(26+rnd()*46)*depth;      // visible travel, still slow
+  const lift=(10+rnd()*30)*depth;
+  const sweep=(8+rnd()*24)*depth;
+  const wobble=(rnd()-.5)*18*depth;
+
+  p.style.setProperty('--x',x.toFixed(3)+'%');
+  p.style.setProperty('--y',y.toFixed(3)+'%');
+  p.style.setProperty('--s',s.toFixed(2)+'px');
+  p.style.setProperty('--a',(0.22+rnd()*.58).toFixed(3));
+  /* Long varied loops: visible movement, not fast particle spray. */
+  p.style.setProperty('--d',(18+rnd()*24).toFixed(2)+'s');
+  p.style.setProperty('--delay',(-rnd()*38).toFixed(2)+'s');
+  p.style.setProperty('--mx1',(side*span*.42).toFixed(2)+'px');
+  p.style.setProperty('--my1',(-lift*.28+wobble*.15).toFixed(2)+'px');
+  p.style.setProperty('--mx2',(side*(span*.78+sweep*.20)).toFixed(2)+'px');
+  p.style.setProperty('--my2',(-lift*.72+wobble*.42).toFixed(2)+'px');
+  p.style.setProperty('--mx3',(side*(span*.30-sweep*.36)).toFixed(2)+'px');
+  p.style.setProperty('--my3',(-lift*.96+wobble*.16).toFixed(2)+'px');
+  return p;
+ }
+ function build(){
+  host.innerHTML='';seed=0x51D05A;
+  const frag=document.createDocumentFragment();
+  /* Compatibility sentinel prevents all older glitter builders from stacking. */
+  const sentinel=document.createElement('i');
+  sentinel.className='v34-glitter v44-glitter v45-glitter v49-glitter v50-glitter v51-sentinel';
+  sentinel.hidden=true;frag.appendChild(sentinel);
+  const total=264,cloudCount=251; // +20% baseline; 95.1% lower-middle
+  for(let i=0;i<total;i++)frag.appendChild(makeParticle(i,i<cloudCount));
+  host.appendChild(frag);
+ }
+ build();
+ const applyBase=v26ApplyUiModeClass;
+ v26ApplyUiModeClass=function(...args){const out=applyBase(...args);requestAnimationFrame(()=>{if(document.body.classList.contains('ui-modern')&&!host.querySelector('.v51-glitter'))build()});return out};
+ const setBase=v26SetUiMode;
+ v26SetUiMode=function(...args){const out=setBase(...args);requestAnimationFrame(()=>{if(document.body.classList.contains('ui-modern')&&!host.querySelector('.v51-glitter'))build()});return out};
+ const debugBase=updateDebug;
+ updateDebug=function(...args){const out=debugBase(...args),d=document.querySelector('#debug');if(d&&!d.classList.contains('hidden')){d.textContent=d.textContent.replace(/^v0\.\d+/m,'v0.52');d.textContent+='\nmodernGlitter=dom-v52 particles=264 cloud=251 bank=wide-lower-middle motion=curved-drift-css'}return out};
+})();
+
+/* ========================================================================== */
+/* v0.53 — foreground input ownership + user-flow glitter + shell art         */
+/* ========================================================================== */
+window.__dorukstationVersion='0.53';
+document.title='DorukStation — v0.53';
+
+const V53_DORUKCRAFT_ICON='assets/skin/dorukcraft-user.png';
+const V53_SHARPS_PLAYROOM_ICON='assets/skin/sharps-playroom.png';
+
+function v53SharpsPlayroomApp(){
+ const manifest=Array.isArray(window.DorukStationGameManifest)?window.DorukStationGameManifest:[];
+ const found=manifest.find(g=>{
+  const text=`${g?.id||''} ${g?.name||''} ${g?.title||''} ${g?.file||''}`.toLowerCase();
+  return /sharp.?s/.test(text)&&/(playroom|playground)/.test(text);
+ });
+ if(found&&typeof dsFolderGameApp==='function'){
+  const app=dsFolderGameApp(found);
+  return {...app,id:'sharps-playroom',name:"Sharp's Playroom",image:V53_SHARPS_PLAYROOM_ICON,type:'image',modernOnly:true};
+ }
+ return {
+  id:'sharps-playroom',name:"Sharp's Playroom",
+  desc:"Sharp's Playroom — Modern DorukStation showcase.",
+  live:'Modern-mode showcase tile. The NO-GAMES shell keeps the game payload outside this update.',
+  image:V53_SHARPS_PLAYROOM_ICON,type:'image',action:'placeholder',modernOnly:true,inFolder:true
+ };
+}
+
+function v53ApplyShellArt(){
+ const dc=apps.find(a=>a.id==='dorukcraft');
+ if(dc){dc.image=V53_DORUKCRAFT_ICON;dc.type='image'}
+}
+
+function v53SyncModernOnlyApps(){
+ v53ApplyShellArt();
+ const modern=typeof v26UiMode==='function'&&v26UiMode()==='modern';
+ let changed=false;
+ for(let i=apps.length-1;i>=0;i--){
+  if(apps[i]?.id==='sharps-playroom'){
+   if(!modern){apps.splice(i,1);changed=true}
+   else apps.splice(i,1);
+  }
+ }
+ if(modern){
+  const lib=Math.max(0,apps.findIndex(a=>a.id==='library'));
+  apps.splice(lib>=0?lib:apps.length,0,v53SharpsPlayroomApp());
+  changed=true;
+ }
+ ensureLibraryLast();
+ S.app=Math.max(0,Math.min(S.app,Math.max(0,apps.length-1)));
+ return changed;
+}
+
+/* The glitter already exists as one lightweight 264-particle field. Instead
+   of duplicating it for login, temporarily re-parent the same field into the
+   active Modern user-flow screen. The screen background covers game artwork;
+   glitter is then painted over that cover but under every card/button. */
+function v53UserFlowRoot(){
+ if(S.avatarPickerOpen)return document.querySelector('#avatarPicker');
+ if(S.createUserOpen)return document.querySelector('#createUserView');
+ if(S.createChoiceOpen)return document.querySelector('#createUserChoice');
+ if(S.userSelectOpen)return document.querySelector('#userSelect');
+ return null;
+}
+function v53SyncUserGlitter(){
+ const host=document.querySelector('#modernGlitter'),viewport=document.querySelector('#viewport');
+ if(!host||!viewport)return;
+ const modern=document.body.classList.contains('ui-modern');
+ const root=modern&&document.body.classList.contains('user-flow-open')?v53UserFlowRoot():null;
+ if(root){
+  if(host.parentElement!==root)root.insertBefore(host,root.firstChild);
+  host.classList.add('v53-user-glitter-host');
+ }else{
+  if(host.parentElement!==viewport){
+   const shade=document.querySelector('#backgroundShade');
+   viewport.insertBefore(host,shade||document.querySelector('#bootScreen')||viewport.firstChild);
+  }
+  host.classList.remove('v53-user-glitter-host');
+ }
+}
+
+/* Keep Modern-only apps and login glitter correct across live mode changes. */
+const v53ApplyUiModeBase=v26ApplyUiModeClass;
+v26ApplyUiModeClass=function(...args){
+ const out=v53ApplyUiModeBase(...args);v53SyncModernOnlyApps();
+ requestAnimationFrame(()=>{v53SyncUserGlitter();if(currentProfile)render()});
+ return out;
+};
+const v53SetUiModeBase=v26SetUiMode;
+v26SetUiMode=function(...args){
+ const out=v53SetUiModeBase(...args);v53SyncModernOnlyApps();
+ requestAnimationFrame(()=>{v53SyncUserGlitter();if(currentProfile)render()});
+ return out;
+};
+const v53UserFlowBase=setUserFlowVisual;
+setUserFlowVisual=function(open){const out=v53UserFlowBase(open);requestAnimationFrame(v53SyncUserGlitter);setTimeout(v53SyncUserGlitter,70);return out};
+const v53SwapUiBase=swapUi;
+swapUi=function(...args){const out=v53SwapUiBase(...args);requestAnimationFrame(v53SyncUserGlitter);setTimeout(v53SyncUserGlitter,80);return out};
+const v53ShowUiBase=showUi;
+showUi=function(...args){const out=v53ShowUiBase(...args);if(document.body.classList.contains('user-flow-open'))requestAnimationFrame(v53SyncUserGlitter);return out};
+const v53HideUiBase=hideUi;
+hideUi=function(...args){const out=v53HideUiBase(...args);if(document.body.classList.contains('user-flow-open')){requestAnimationFrame(v53SyncUserGlitter);setTimeout(v53SyncUserGlitter,UI_EXIT_MS+35)}return out};
+
+v53SyncModernOnlyApps();
+requestAnimationFrame(()=>{v53SyncUserGlitter();if(currentProfile)render()});
+
+/* The actual foreground router lives in a small independently tested file.
+   It is loaded after app.js so it wraps the final v0.53 shell functions. */
+const v53DebugBase=updateDebug;
+updateDebug=function(...args){
+ const out=v53DebugBase(...args),d=document.querySelector('#debug');
+ if(d&&!d.classList.contains('hidden')){
+  d.textContent=d.textContent.replace(/^v0\.\d+/m,'v0.53');
+  d.textContent+='\nforegroundOwner='+(window.__ds53InputOwner?.current?.()||'pending')+' modernOnly=sharps-playroom';
+ }
+ return out;
+};

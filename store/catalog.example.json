@@ -1,0 +1,8 @@
+{
+  "schemaVersion": 2,
+  "updatedAt": "2026-08-31T00:00:00Z",
+  "games": [
+    {"manifestUrl": "games/example-game/manifest.json"},
+    {"manifestUrl": "games/example-racing/manifest.json"}
+  ]
+}

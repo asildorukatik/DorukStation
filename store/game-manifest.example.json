@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 2,
+  "id": "example-game",
+  "name": "Example Game",
+  "version": "1.0.0",
+  "description": "Replace this with a short Store description.",
+  "age": "7+",
+  "genres": ["Adventure"],
+  "tags": ["singleplayer"],
+  "featured": false,
+  "icon": "Logo/icon.png",
+  "banner": "Logo/banner.png",
+  "screenshots": [
+    "Screenshots/01.png"
+  ],
+  "packageUrl": "Game.zip",
+  "packageSize": 0,
+  "sha256": "",
+  "entry": "Game/index.html"
+}

@@ -1,0 +1,12 @@
+DorukStation Web v0.61
+
+Launch: index.html
+
+Key changes:
+- Input Mode is detected fresh every launch/session.
+- First touch = Mobile, first keyboard/mouse input = PC, first gamepad action = Controller.
+- Settings > Input Mode is a session-only override and is not persisted.
+- Classic uses only the uploaded animated Flow backgrounds.
+- Flow choices: Blue, Red, Green, Orange, Black, Purple, Yellow, Turquoise.
+- Theme switches preserve the current video phase and fade the new Flow above the old Flow before removing the old layer.
+- Modern never renders the uploaded Classic Flow videos and keeps its own Modern visual system.

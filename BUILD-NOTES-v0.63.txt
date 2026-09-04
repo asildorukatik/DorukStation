@@ -1,0 +1,6 @@
+DorukStation Web v0.63
+- Renamed Classic Flow Theme to Change Background.
+- Added page-only hover/focus preview palette with fade transitions.
+- Static Classic palettes now interpolate on committed theme changes.
+- Real Flow video remains unchanged during preview; selecting still uses v0.61 phase-synced crossfade.
+- Applied the user-provided SST font family to the DorukStation shell via embedded web subsets.

@@ -1,0 +1,12 @@
+DorukStation v0.58 Store update
+
+This shell update does not bundle downloadable Store game packages and does not replace your existing games/ folder.
+
+Store preview metadata can remain unzipped on GitHub: catalog.json -> per-game manifest.json -> Logo/Screenshots. The heavy Game.zip downloads only after Install.
+
+Browser storage (OPFS/IndexedDB) remains the default. Users can switch the global install location to a real folder or override one specific game.
+
+Sharp's Playroom remains represented as the preinstalled Store title. Other Store games are not preinstalled.
+
+
+v0.59 changes shell focus/layout only and contains no downloadable game payloads.

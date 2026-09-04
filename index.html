@@ -3,8 +3,15 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>DorukStation — v0.39</title>
+<title>DorukStation — v0.64</title>
 <link rel="stylesheet" href="app.css">
+  <link rel="stylesheet" href="v58-store.css">
+  <link rel="stylesheet" href="v58-whats-new.css">
+  <link rel="stylesheet" href="v59-focus.css">
+  <link rel="stylesheet" href="v61-session-flow.css">
+  <link rel="stylesheet" href="v62-theme-surfaces-startup.css">
+  <link rel="stylesheet" href="v63-background-preview.css">
+  <link rel="stylesheet" href="v64-flow-panel-preview.css">
 </head>
 <body>
 <div id="viewport">
@@ -28,16 +35,23 @@
     </div>
   </section>
 
-  <section id="controllerGate" class="hidden" aria-label="Connect a controller">
+  <section id="controllerGate" class="hidden" aria-label="Connect a controller or begin DorukStation">
     <div class="controller-gate-panel">
-      <h1>Press any button or click/tap anywhere</h1>
+      <p id="controllerGateTopLine" class="controller-gate-topline">Press any button on your controller, or click / tap anywhere.</p>
+      <div class="controller-gate-logo-wrap" aria-hidden="true">
+        <div class="controller-gate-logo-ring">
+          <img id="controllerGateLogo" class="controller-gate-logo" src="assets/branding/dorukstation-logo-bright.png" alt="DorukStation logo">
+        </div>
+      </div>
+      <div class="controller-gate-brand">DorukStation</div>
+      <h1 id="controllerGateHeadline">Press any button or click/tap anywhere</h1>
       <p id="inputDetectHint">Touch → Mobile · Keyboard / Mouse → PC · Controller → Controller</p>
       <button id="playWithoutController" class="hidden" type="button" aria-hidden="true">Continue</button>
       <small id="inputModeGateStatus">DorukStation will remember the detected Input Mode until you change it in Settings.</small>
     </div>
   </section>
 
-  <section id="userSelect" class="hidden" aria-label="Choose DorukStation user">
+  <section id="userSelect" aria-label="Choose DorukStation user">
     <div class="user-select-panel">
       <h1 id="userSelectTitle">Select User</h1>
       <p id="userSelectSubtitle">Game saves, trophies and settings stay separate for every local user.</p>
@@ -188,7 +202,7 @@
 
 
 
-  <!-- v0.39: mobile/touch virtual controller. The same controller is used by
+  <!-- v0.38: mobile/touch virtual controller. The same controller is used by
        Classic/Modern shell navigation and exposed to running HTML games as a
        standard Gamepad when touch controls are active. -->
   <section id="mobileControls" class="mobile-controls hidden" aria-label="DorukStation touch controller">
@@ -252,5 +266,15 @@
 </div>
 <script src="games/manifest.js"></script>
 <script src="app.js"></script>
+<script src="v53-input-layer.js"></script>
+<script src="v54-shell-restoration.js"></script>
+<script src="v55-game-management-restoration.js"></script>
+<script src="v56-custom-game-picker-fix.js"></script>
+<script src="v58-store.js"></script>
+<script src="v58-whats-new.js"></script>
+<script src="v59-shell-polish.js"></script>
+<script src="v61-session-flow.js"></script>
+<script src="v62-theme-surfaces-startup.js"></script>
+<script src="v64-flow-panel-preview.js"></script>
 </body>
 </html>

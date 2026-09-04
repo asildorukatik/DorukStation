@@ -1,0 +1,6 @@
+DorukStation Web v0.64
+- Corrected Change Background preview: hover/focus now plays the actual selected Flow video inside the Change Background page.
+- Preview uses a page-local two-video crossfade deck and never changes S.theme until Select/Enter/click.
+- Leaving fades the page-local video away to reveal the committed real Flow background.
+- v0.61 continues to own real phase-synchronised Flow switching.
+- v0.63 SST font embedding and committed static-surface color interpolation remain active.

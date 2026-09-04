@@ -1,0 +1,25 @@
+
+/* v0.61 — session input detection + phase-synchronised Classic Flow video deck */
+#flowVideoBackground{display:none!important}
+#flowVideoDeck{position:absolute;inset:0;z-index:0;pointer-events:none;overflow:hidden;background:#001d66}
+.flow-phase-video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:0;pointer-events:none;will-change:opacity;transition:opacity 1.35s ease;z-index:0}
+.flow-phase-video.flow-visible{opacity:1}
+body.ui-classic #flowColor,
+body.ui-classic #photoBackground,
+body.ui-classic .wave{opacity:0!important}
+body.ui-classic #flowVideoDeck{opacity:1}
+body.ui-modern #flowVideoDeck{opacity:0!important}
+body.ui-modern #photoBackground{opacity:0!important}
+body.ui-modern #flowVideoBackground{display:none!important}
+body.ui-classic #backgroundShade{z-index:4;background:linear-gradient(180deg,rgba(0,0,0,.025),rgba(0,0,0,.055) 43%,rgba(0,0,0,.27)),radial-gradient(circle at 45% 37%,transparent 18%,rgba(0,0,0,.10) 88%)}
+body.no-animation .flow-phase-video{transition:opacity .18s ease}
+.v61-flow-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:18px;padding:4px}
+.v61-flow-card{appearance:none;position:relative;height:178px;border:4px solid transparent;background:#071b43;padding:0;overflow:hidden;color:#fff;text-align:left;transition:transform .15s ease,border-color .15s ease,box-shadow .15s ease}
+.v61-flow-card.focused{border-color:#fff;transform:scale(1.032);box-shadow:0 16px 38px rgba(0,0,0,.32)}
+.v61-flow-card .thumb{position:absolute;inset:0;background-size:cover;background-position:center}
+.v61-flow-card:after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,.01),rgba(0,0,0,.08) 46%,rgba(0,0,0,.82) 100%)}
+.v61-flow-card .name,.v61-flow-card .active,.v61-flow-card .tag{position:absolute;z-index:2}
+.v61-flow-card .name{left:12px;bottom:12px;font-size:22px;font-weight:500;text-shadow:0 2px 7px #000}
+.v61-flow-card .tag{left:12px;top:10px;font-size:11px;letter-spacing:.08em;text-transform:uppercase;opacity:.82;text-shadow:0 2px 5px #000}
+.v61-flow-card .active{right:9px;top:9px;padding:5px 8px;background:rgba(0,0,0,.72);font-size:11px;font-weight:700;letter-spacing:.05em}
+@media(max-width:1100px){.v61-flow-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}

@@ -1,0 +1,116 @@
+/* DorukStation Web v0.62 — theme-aware Classic surfaces, full-height pages, ordered startup */
+:root{
+  --ds-surface-1:#084b9b;
+  --ds-surface-2:#062f78;
+  --ds-surface-3:#031b52;
+  --ds-surface-soft:rgba(5,39,103,.72);
+}
+
+/* --------------------------------------------------------------------------
+   Ordered startup.  The animated Flow/Modern glitter stays viewport-level;
+   the 1920x1080 shell itself is not revealed until a user has signed in.
+   -------------------------------------------------------------------------- */
+#stage{transition:opacity .42s ease,filter .42s ease!important}
+body.v62-shell-concealed #stage{opacity:0!important;filter:blur(4px)!important;pointer-events:none!important}
+body.v62-shell-revealing #stage{opacity:1!important;filter:none!important}
+body.v62-startup-locked #stage{pointer-events:none!important}
+body.v62-startup-locked #pageView,
+body.v62-startup-locked #rightMenu,
+body.v62-startup-locked #quickMenuOverlay,
+body.v62-startup-locked #shareMenuOverlay,
+body.v62-startup-locked #appSurface,
+body.v62-startup-locked #mobileControls{pointer-events:none!important}
+/* The input gate is the only interactive surface during the input phase. */
+body.v62-startup-locked.v62-input-phase #controllerGate{pointer-events:auto!important}
+body.v62-startup-locked:not(.v62-input-phase) #controllerGate{pointer-events:none!important}
+body.v62-startup-locked.v62-user-phase #userSelect,
+body.v62-startup-locked.v62-user-phase #createUserChoice,
+body.v62-startup-locked.v62-user-phase #createUserView,
+body.v62-startup-locked.v62-user-phase #avatarPicker{pointer-events:auto!important}
+
+/* Let the selected Flow remain visible around/behind pre-login panels. */
+body.ui-classic #controllerGate .controller-gate-panel{
+  background:color-mix(in srgb,var(--ds-surface-3) 55%,transparent)!important;
+  border-color:rgba(255,255,255,.14)!important;
+}
+body.ui-classic #userSelect,
+body.ui-classic #createUserChoice,
+body.ui-classic #createUserView,
+body.ui-classic #avatarPicker{
+  background:linear-gradient(135deg,
+    color-mix(in srgb,var(--ds-surface-1) 88%,transparent),
+    color-mix(in srgb,var(--ds-surface-2) 91%,transparent) 52%,
+    color-mix(in srgb,var(--ds-surface-3) 95%,transparent))!important;
+  backdrop-filter:blur(12px) saturate(1.08)!important;
+}
+
+/* --------------------------------------------------------------------------
+   Classic system surfaces use the current Flow colour family, but DO NOT show
+   the moving Flow video inside the page.  Modern remains untouched/glitter-only.
+   -------------------------------------------------------------------------- */
+body.ui-classic #pageView{
+  background:linear-gradient(135deg,var(--ds-surface-1),var(--ds-surface-2) 52%,var(--ds-surface-3))!important;
+  backdrop-filter:none!important;
+}
+body.ui-classic.ps4-settings-page #pageView{
+  background:linear-gradient(145deg,var(--ds-surface-1),var(--ds-surface-2) 56%,var(--ds-surface-3))!important;
+}
+body.ui-classic .quick-menu-panel{
+  background:linear-gradient(105deg,var(--ds-surface-3),var(--ds-surface-2) 72%,var(--ds-surface-1))!important;
+}
+body.ui-classic .share-menu-panel{
+  background:linear-gradient(105deg,var(--ds-surface-2),var(--ds-surface-1))!important;
+}
+body.ui-classic .session-status{background:color-mix(in srgb,var(--ds-surface-3) 58%,transparent)!important}
+
+/* Store: remove legacy fixed blue and fill the full shell canvas. */
+body.v57-store-open #pageView{padding:0!important;overflow:hidden!important}
+body.v57-store-open #pageBody{
+  position:absolute!important;
+  inset:0!important;
+  width:auto!important;
+  height:auto!important;
+  min-height:100%!important;
+  padding:0!important;
+  overflow:auto!important;
+}
+.v57-store{min-height:1080px!important;height:auto!important}
+body.ui-classic .v57-store-classic{
+  background:linear-gradient(135deg,var(--ds-surface-1),var(--ds-surface-2) 55%,var(--ds-surface-3))!important;
+}
+body.ui-classic .v57-store-classic:before{
+  background:linear-gradient(158deg,transparent 45%,rgba(255,255,255,.085) 45.4%,transparent 46.2%),
+             linear-gradient(166deg,transparent 61%,rgba(255,255,255,.065) 61.3%,transparent 62%)!important;
+}
+body.ui-classic .v57-store-rail button:not(.active),
+body.ui-classic .v57-search-result-list button,
+body.ui-classic .v57-key,
+body.ui-classic .v57-storage-panel,
+body.ui-classic .v57-download-cancel{
+  background:color-mix(in srgb,var(--ds-surface-3) 58%,transparent)!important;
+}
+body.ui-classic .v57-download-progress{background:color-mix(in srgb,var(--ds-surface-3) 72%,#000 28%)!important}
+
+/* What's New: same full-height fix and selected-theme static surface. */
+body.v58-news-open #pageView{padding:0!important;overflow:hidden!important}
+body.v58-news-open #pageBody{
+  position:absolute!important;
+  inset:0!important;
+  width:auto!important;
+  height:auto!important;
+  min-height:100%!important;
+  padding:0!important;
+  overflow:auto!important;
+}
+.v58-whats-new{min-height:1080px!important;height:auto!important}
+body.ui-classic .v58-whats-new-classic{
+  background:linear-gradient(145deg,var(--ds-surface-1) 0%,var(--ds-surface-2) 50%,var(--ds-surface-3) 100%)!important;
+}
+body.ui-classic .v58-release-card{background:color-mix(in srgb,var(--ds-surface-3) 54%,transparent)!important}
+body.ui-classic .v58-news-footer{
+  background:linear-gradient(180deg,transparent,color-mix(in srgb,var(--ds-surface-3) 96%,#000 4%) 35%)!important;
+}
+
+@media(prefers-reduced-motion:reduce){
+  #stage{transition-duration:.01ms!important}
+}

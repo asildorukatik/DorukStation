@@ -67,6 +67,68 @@ Modern mode's glitter effect, glass surfaces, layout overrides, and mode selecto
 ## v0.28 system-sound mapping
 DorukStation v0.28 maps the supplied Classic and Modern `SoundEffects/ALL` banks by the semantic names embedded in the gamerip filenames (for example menu enter/back, OSK cursor/key/backspace, notification/trophy, Open/Close Control Center, Open/Close Option Menu, Open OSK, Open Home and Take Screenshot). Source-project/console names in this credits file are preserved for accurate attribution even though the runtime UI is DorukStation-branded.
 
-## v0.36 Flappy Bird-style game
+## v0.35 Flappy Bird-style game
 
 The bundled `games/Flappy-Bird.html`, its icon, and banner are original DorukStation assets created for this build. The game recreates the familiar one-button pipe-dodging gameplay mechanically but does not include the original Flappy Bird game's art, audio, or source code.
+
+
+## Modern UI visual reference (v0.43)
+- InitialDin/ps5-menu-es-de — https://github.com/InitialDin/ps5-menu-es-de
+  - Used only as a visual/structural reference for layered PS5-style background treatment and media presentation.
+  - No repository assets or source code were copied into DorukStation v0.43.
+
+
+## PS5 UI particle reference (v0.45)
+- Sony Design, “PlayStation 5 Design Story”: visual reference only. Sony describes the PS5 initial setup as using glimmering particles of light and emphasizes a minimal UI. No Sony assets or code copied.
+- InitialDin/ps5-menu-es-de: layout/atmosphere reference only. No project artwork, fonts, video, or code copied into DorukStation.
+
+
+## v0.47 glitter research
+- Sony PS5 Design Story: used only as behavioral/visual reference for glimmering particles of light; no code/assets copied.
+- Sony PS5 Quick Start/Home UI documentation: used for general Modern home layout reference; no code/assets copied.
+- InitialDin/ps5-menu-es-de: inspected as a public PS5-inspired theme reference; no project assets copied into DorukStation.
+
+## v0.51 glitter-motion research
+- Sony Design, “PlayStation 5 Design Story”: Sony describes the PS5 setup treatment as particles of light that glimmer in an animation intended to feel like a portal opening. https://www.sony.com/en/SonyInfo/design/stories/PS5/
+- PlayStation Blog, “First look: PlayStation 5’s next-generation user experience”: official PS5 UX reveal/reference. https://blog.playstation.com/2020/10/15/first-look-playstation-5s-next-generation-user-experience/
+- GamesRadar, coverage of Sony’s Future of Gaming startup sequence: describes shifting particles lit by rays of light. Used only as motion-reference research, not copied assets/code. https://www.gamesradar.com/ps5-start-up-screen-may-have-debuted-during-the-future-of-gaming-event/
+
+Implementation remains original: lightweight transform-only DOM particles with long curved drift loops; no Sony assets or code are included.
+
+
+## v0.53 user-provided shell artwork
+- `assets/skin/dorukcraft-user.png` is copied byte-for-byte from the user-provided `DorukCraftIcon.png`.
+- `assets/skin/sharps-playroom.png` is copied byte-for-byte from the user-provided Sharp's Playroom artwork.
+- No Sharp's Playroom game payload is bundled in the NO-GAMES shell update.
+
+
+## v0.54
+Shell restoration is original DorukStation code. Existing user-supplied system-audio assets are reused; no new external assets were added.
+
+## v0.55 restoration
+- No new third-party assets or code were added.
+- Game-management restoration is DorukStation shell code.
+- Installed game payloads are intentionally excluded from this distribution.
+
+## v0.56
+- No new third-party assets or code were added.
+- Fix is original DorukStation input-routing code for trusted shell file pickers.
+
+## v0.57 Store
+
+- Store layout and interaction direction: user-supplied Classic console Store, Search, Downloads, Library and quick-system reference photographs (`DorukStationPhotos.zip`).
+- Remote Store catalog default: `https://raw.githubusercontent.com/asildorukatik/DorukStation-Game-Library/main/catalog.json`.
+- No third-party Store game packages are bundled by this shell update.
+- ZIP extraction, SHA-256 verification, OPFS/IndexedDB storage, File System Access storage selection, and the virtual-game service worker are implemented locally in `v57-store.js` / `v57-game-vfs-sw.js` without an external JavaScript ZIP dependency.
+
+
+## v0.58 Store / What's New
+
+- Store layout refinements continue to use the user-supplied Classic console UI photographs in `DorukStationPhotos.zip` as visual references.
+- v0.58 Store filtering, linked-manifest loading, external-manifest package support and What's New release-history UI are original DorukStation code.
+- The separate game-package example uses the user-provided DorukCraft icon only as a replace-me placeholder image.
+- No third-party Store game package is bundled in the shell update.
+
+
+## v0.59 reference pass
+Classic Home selection proportions were adjusted from user-supplied DorukStation/console reference photographs. No reference image is redistributed in this package.

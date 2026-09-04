@@ -1,5 +1,17 @@
 DorukStation runtime user folders
+=================================
 
-The web build cannot create real files beside the app while it is running, so user folders are virtual browser-storage namespaces. Permanent profiles carry a folder path like users/user-abc123/. Guest sessions use users/__guest__/guest-.../ and are purged automatically.
+DorukStation profiles use isolated browser-storage namespaces that mirror a
+folder layout. A permanent profile receives a root such as:
 
-Existing pre-v0.15 game save namespace identifiers are preserved so upgrades do not intentionally erase existing worlds.
+  users/user-abc123/
+    shell/                 shell settings and per-user Home/Games-folder choices
+    games/<game-id>/       each game's save/localStorage namespace
+    imported/              logical home for the user's imported HTML app list
+
+The browser build cannot create those physical directories beside index.html at
+runtime; the paths are namespace identifiers. Guest folders live below
+users/__guest__/ and are purged automatically.
+
+Installed game files are global. A different user gets the same installed game
+but a different users/<id>/games/<game-id>/ save namespace.
