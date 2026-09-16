@@ -1,0 +1,37 @@
+/* DorukStation Web v0.65 — OS synchronization + external media.
+   This file intentionally layers on v0.64 without changing its layout. */
+
+.v65-media-badge{
+  position:absolute!important;right:8px!important;bottom:8px!important;width:28px!important;height:28px!important;
+  object-fit:contain!important;z-index:20!important;filter:drop-shadow(0 2px 5px rgba(0,0,0,.72));pointer-events:none!important;
+}
+.app-tile.focused .v65-media-badge{width:32px!important;height:32px!important;right:9px!important;bottom:9px!important}
+.v65-title-media-badge{display:inline-block!important;width:.88em!important;height:.88em!important;margin-left:.34em!important;vertical-align:-.08em!important;object-fit:contain!important;filter:drop-shadow(0 2px 4px rgba(0,0,0,.45))}
+
+/* Clockwise app-install mask. Completed area is transparent; remaining area stays dark. */
+.v65-install-progress,.v57-tile-progress{
+  position:absolute!important;inset:0!important;left:0!important;right:0!important;bottom:0!important;z-index:18!important;
+  pointer-events:none!important;display:block!important;background:conic-gradient(from -90deg,transparent 0 var(--ds-progress,0%),rgba(0,0,0,.64) var(--ds-progress,0%) 100%)!important;
+  text-shadow:0 1px 4px rgba(0,0,0,.95)!important;
+}
+.v65-install-progress::after,.v57-tile-progress::after{
+  content:"";position:absolute;left:50%;top:50%;width:2px;height:45%;background:rgba(255,255,255,.92);transform-origin:50% 100%;
+  transform:translate(-50%,-100%) rotate(var(--ds-angle,0deg));border-radius:999px;box-shadow:0 0 5px rgba(0,0,0,.7);opacity:.9;
+}
+.v65-install-progress>span,.v57-tile-progress>span{position:absolute!important;left:8px!important;right:8px!important;bottom:7px!important;font-size:11px!important;font-weight:600!important;color:#fff!important;text-align:center!important;white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important}
+.v57-tile-progress-track{display:none!important}
+.v65-install-progress.v65-complete,.v57-tile-progress.v65-complete{display:none!important}
+
+/* Store cards use the same circular reveal instead of a horizontal bar. */
+.v57-card-art{position:relative}
+.v57-card-progress{
+  position:absolute!important;inset:0!important;left:0!important;right:0!important;bottom:0!important;height:auto!important;z-index:8!important;border:0!important;
+  background:conic-gradient(from -90deg,transparent 0 var(--ds-progress,0%),rgba(0,0,0,.64) var(--ds-progress,0%) 100%)!important;pointer-events:none!important;
+}
+.v57-card-progress>i{display:none!important}
+.v57-card-progress::after{content:"";position:absolute;left:50%;top:50%;width:2px;height:44%;background:rgba(255,255,255,.92);transform-origin:50% 100%;transform:translate(-50%,-100%) rotate(var(--ds-angle,0deg));border-radius:999px;box-shadow:0 0 5px rgba(0,0,0,.7)}
+.v57-card-progress.v65-complete{display:none!important}
+
+/* External badges in Library stay small and do not alter v0.64 card geometry. */
+.v40-page-cover-text b,.v41-classic-title{display:flex;align-items:center;min-width:0}
+.v40-page-cover-text b .v65-title-media-badge,.v41-classic-title .v65-title-media-badge{flex:0 0 auto;width:17px!important;height:17px!important;margin-left:7px!important}

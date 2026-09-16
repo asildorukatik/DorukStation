@@ -1,0 +1,80 @@
+/* DorukStation Web v0.67 — device role selector + GitHub Pages E-Controller */
+.v67-overlay{position:fixed;inset:0;z-index:2400;display:grid;place-items:center;background:#05070d;color:#fff;font-family:Arial,Helvetica,sans-serif;overflow:auto;padding:max(24px,env(safe-area-inset-top)) max(20px,env(safe-area-inset-right)) max(24px,env(safe-area-inset-bottom)) max(20px,env(safe-area-inset-left));box-sizing:border-box}
+.v67-overlay.hidden,.v67-approval.hidden,.v67-host-badge.hidden,.v67-controller-status.hidden{display:none!important}
+.v67-role-panel{width:min(860px,94vw);text-align:center}
+.v67-role-logo{width:min(420px,70vw);max-height:92px;object-fit:contain;margin:0 auto 28px;display:block}
+.v67-kicker{margin:0 0 10px;font-size:12px;font-weight:800;letter-spacing:.2em;color:rgba(255,255,255,.56)}
+.v67-role-panel h1,.v67-pair-panel h1{font-weight:300;font-size:clamp(34px,4.5vw,58px);margin:0 0 12px;letter-spacing:-.02em}
+.v67-role-subtitle,.v67-pair-panel>p{margin:0 auto 28px;max-width:680px;color:rgba(255,255,255,.7);font-size:17px;line-height:1.45}
+.v67-role-options{display:grid;gap:12px;width:min(720px,100%);margin:0 auto}
+.v67-role-option{appearance:none;border:2px solid rgba(255,255,255,.18);border-radius:18px;background:rgba(255,255,255,.055);color:#fff;text-align:left;padding:20px 22px;display:flex;flex-direction:column;gap:5px;cursor:pointer;transition:transform .14s ease,border-color .14s ease,background .14s ease;box-shadow:none}
+.v67-role-option strong{font-size:22px;font-weight:600}.v67-role-option span{font-size:14px;color:rgba(255,255,255,.63);line-height:1.35}
+.v67-role-option:hover,.v67-role-option:focus-visible,.v67-role-option.focused{outline:none;border-color:#fff;background:rgba(255,255,255,.12);transform:scale(1.018)}
+.v67-role-option.v67-permanent{background:rgba(55,110,220,.09)}
+.v67-role-divider{display:flex;align-items:center;gap:12px;color:rgba(255,255,255,.4);font-size:11px;font-weight:800;letter-spacing:.18em}.v67-role-divider:before,.v67-role-divider:after{content:"";height:1px;flex:1;background:rgba(255,255,255,.14)}
+.v67-role-hint{display:block;margin-top:18px;color:rgba(255,255,255,.48)}
+.v67-controller-pair{background:#000}
+.v67-pair-panel{width:min(560px,92vw);text-align:center}
+#eControllerPairForm{display:flex;gap:10px;justify-content:center;margin:24px auto 14px}
+#eControllerPairCode{width:min(270px,58vw);height:64px;border:2px solid rgba(255,255,255,.38);border-radius:14px;background:#0c0c0c;color:#fff;font:700 30px/1 ui-monospace,SFMono-Regular,Consolas,monospace;letter-spacing:.18em;text-align:center;outline:none;box-sizing:border-box}
+#eControllerPairCode:focus{border-color:#fff}
+#eControllerConnectButton,.v67-approval-actions button{min-width:126px;border:0;border-radius:14px;padding:0 20px;background:#f0f0f0;color:#070707;font-size:16px;font-weight:700;cursor:pointer}
+.v67-pair-status{min-height:22px;margin:12px 0;color:rgba(255,255,255,.7);font-size:14px}.v67-pair-status.error{color:#ff8f8f}
+.v67-text-button{border:0;background:transparent;color:rgba(255,255,255,.62);font-size:14px;text-decoration:underline;cursor:pointer;padding:10px}
+.v67-approval{position:fixed;inset:0;z-index:3200;display:grid;place-items:center;background:rgba(0,0,0,.72);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);padding:20px}
+.v67-approval-card{width:min(520px,92vw);border:1px solid rgba(255,255,255,.22);border-radius:22px;background:#12151d;color:#fff;padding:30px;box-shadow:0 22px 80px rgba(0,0,0,.6);font-family:Arial,Helvetica,sans-serif}.v67-approval-card h2{margin:0 0 10px;font-size:28px;font-weight:500}.v67-approval-card>p:not(.v67-kicker){margin:0;color:rgba(255,255,255,.68);line-height:1.45}.v67-approval-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:26px}.v67-approval-actions button{height:48px;background:rgba(255,255,255,.12);color:#fff;border:1px solid rgba(255,255,255,.16)}.v67-approval-actions button.primary{background:#fff;color:#080808}
+.v67-host-badge{position:fixed;left:max(18px,env(safe-area-inset-left));bottom:max(18px,env(safe-area-inset-bottom));z-index:980;min-width:170px;padding:11px 14px;border:1px solid rgba(255,255,255,.2);border-radius:14px;background:rgba(2,5,12,.72);color:#fff;backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);font-family:Arial,Helvetica,sans-serif;box-shadow:0 8px 30px rgba(0,0,0,.3);pointer-events:none}.v67-host-badge span,.v67-host-badge small{display:block;color:rgba(255,255,255,.6);font-size:10px;letter-spacing:.08em}.v67-host-badge strong{display:block;font:700 23px/1.15 ui-monospace,SFMono-Regular,Consolas,monospace;letter-spacing:.12em;margin:2px 0}
+.v67-controller-status{position:fixed;top:max(8px,env(safe-area-inset-top));left:50%;transform:translateX(-50%);z-index:2600;max-width:min(80vw,580px);padding:7px 13px;border-radius:999px;background:rgba(24,24,24,.76);border:1px solid rgba(255,255,255,.18);color:rgba(255,255,255,.82);font:600 12px/1.25 Arial,Helvetica,sans-serif;pointer-events:none;backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+body.v67-econtroller-mode{background:#000!important;overflow:hidden!important}
+body.v67-econtroller-mode #viewport{visibility:hidden!important;pointer-events:none!important}
+body.v67-econtroller-mode #mobileControls{display:block!important;z-index:2500!important;background:#000!important}
+body.v67-econtroller-mode #mobileControls .mc-button{background:rgba(20,20,20,.62)!important;border-color:rgba(255,255,255,.84)!important;box-shadow:0 3px 14px rgba(0,0,0,.8),inset 0 0 9px rgba(255,255,255,.06)!important}
+body.v67-econtroller-mode #mobileControls .mc-stick-ring{background:radial-gradient(circle at 38% 34%,rgba(255,255,255,.12),rgba(45,45,45,.35) 48%,rgba(0,0,0,.72))!important}
+body.v67-econtroller-mode #mobileControls .mc-stick-knob{background:radial-gradient(circle at 40% 32%,rgba(255,255,255,.2),rgba(70,70,70,.42) 54%,rgba(0,0,0,.82))!important}
+body.v67-econtroller-mode #mobileRotateHint{background:rgba(22,22,22,.82)}
+@media(max-width:620px){#eControllerPairForm{flex-direction:column;align-items:stretch}#eControllerPairCode{width:100%}#eControllerConnectButton{height:54px}.v67-role-option{padding:17px 18px}.v67-role-option strong{font-size:20px}}
+body.v67-econtroller-mode #eControllerPair{z-index:2800}
+body.v67-econtroller-mode #mobileControls.hidden{display:none!important}
+
+/* v0.67.1: the controller pairing surface lives inside #viewport, so it must
+   explicitly opt back into visibility while the DorukStation shell is hidden. */
+body.v67-econtroller-mode #eControllerPair{visibility:visible!important;pointer-events:auto!important;z-index:2800}
+body.v67-econtroller-mode #mobileControls{visibility:visible!important}
+body.v67-econtroller-mode #eControllerLiveStatus{visibility:visible!important}
+.v67-discovery-result{display:flex;align-items:center;justify-content:space-between;gap:18px;margin:22px auto 16px;padding:16px 18px;width:min(470px,100%);box-sizing:border-box;border:1px solid rgba(255,255,255,.22);border-radius:16px;background:rgba(255,255,255,.08);text-align:left}
+.v67-discovery-result.hidden,.v67-code-fallback.hidden{display:none!important}
+.v67-discovery-result strong,.v67-discovery-result span{display:block}.v67-discovery-result strong{font-size:18px}.v67-discovery-result span{margin-top:4px;color:rgba(255,255,255,.58);font-size:13px}
+#eControllerDiscoveredConnect{min-width:112px;height:46px;border:0;border-radius:12px;background:#fff;color:#050505;font-size:15px;font-weight:800;cursor:pointer}
+.v67-code-fallback{margin:20px auto 0;width:min(500px,100%)}.v67-code-fallback>p{margin:16px auto 0;color:rgba(255,255,255,.6);font-size:13px;line-height:1.4}
+
+/* v0.67 E-Controller connection controls */
+.v67-disconnect-button{position:fixed;left:50%;right:auto;top:max(46px,calc(env(safe-area-inset-top) + 46px));transform:translateX(-50%);z-index:2700;min-width:154px;padding:10px 14px 11px;border:1px solid rgba(255,255,255,.26);border-radius:14px;background:rgba(22,22,22,.84);color:#fff;font-family:Arial,Helvetica,sans-serif;text-align:left;cursor:pointer;touch-action:none;overflow:hidden;box-shadow:0 8px 26px rgba(0,0,0,.35);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
+.v67-disconnect-button.hidden{display:none!important}
+.v67-disconnect-button strong,.v67-disconnect-button small{position:relative;z-index:2;display:block}.v67-disconnect-button strong{font-size:14px}.v67-disconnect-button small{margin-top:2px;color:rgba(255,255,255,.58);font-size:10px}
+.v67-disconnect-button:after{content:"";position:absolute;left:0;bottom:0;width:100%;height:3px;background:#fff;transform:scaleX(0);transform-origin:left center;transition:none}
+.v67-disconnect-button.holding:after{transform:scaleX(1);transition:transform 2s linear}.v67-disconnect-button.holding{border-color:rgba(255,255,255,.75);background:rgba(45,45,45,.92)}
+body.v67-econtroller-mode #eControllerDisconnect{visibility:visible!important;pointer-events:auto!important}
+
+
+/* v0.67 discovery protocol 2 — explicit search + multi-station list */
+.v67-search-button{min-width:230px;height:52px;margin:8px auto 6px;padding:0 22px;border:0;border-radius:14px;background:#fff;color:#050505;font-size:15px;font-weight:800;cursor:pointer}
+.v67-search-button:disabled{opacity:.55;cursor:default}
+.v67-discovery-list{display:grid;gap:10px;width:min(500px,100%);margin:18px auto 8px}
+.v67-discovery-list.hidden{display:none!important}
+.v67-discovery-row{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:14px 16px;border:1px solid rgba(255,255,255,.22);border-radius:15px;background:rgba(255,255,255,.08);text-align:left}
+.v67-discovery-row strong,.v67-discovery-row small{display:block}.v67-discovery-row strong{font-size:17px}.v67-discovery-row small{margin-top:4px;color:rgba(255,255,255,.56);font-size:12px}
+.v67-discovery-row button{min-width:104px;height:44px;border:0;border-radius:12px;background:#fff;color:#050505;font-size:14px;font-weight:800;cursor:pointer}
+.v67-discovery-empty{padding:16px;border:1px dashed rgba(255,255,255,.2);border-radius:14px;color:rgba(255,255,255,.62);font-size:14px}
+.v67-host-badge .v67-host-station-id{margin:5px 0 3px;color:rgba(255,255,255,.82);font-size:11px;letter-spacing:.04em;text-transform:none}
+
+/* v0.67 web-first discovery controls */
+.v67-search-actions{display:flex;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap;width:min(520px,100%);margin:8px auto 6px}
+.v67-search-actions .v67-search-button{margin:0;min-width:180px;flex:1 1 210px}
+.v67-bluetooth-button{background:rgba(255,255,255,.14);color:#fff;border:1px solid rgba(255,255,255,.28)}
+.v67-transport-badges{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
+.v67-transport-badge{display:inline-flex;align-items:center;gap:5px;padding:4px 7px;border-radius:999px;background:rgba(255,255,255,.11);border:1px solid rgba(255,255,255,.16);font-size:10px;font-weight:800;letter-spacing:.03em;color:rgba(255,255,255,.82)}
+.v67-transport-badge[data-transport="lan"]:before{content:"📶"}
+.v67-transport-badge[data-transport="bluetooth"]:before{content:"ᛒ"}
+.v67-transport-badge[data-transport="web"]:before{content:"🌐"}
+.v67-discovery-row button:disabled{opacity:.55;cursor:default}
+@media (max-width:560px){.v67-search-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px}.v67-search-actions .v67-search-button{min-width:0;width:100%;padding:0 10px;font-size:13px}}

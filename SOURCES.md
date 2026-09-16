@@ -98,8 +98,7 @@ Implementation remains original: lightweight transform-only DOM particles with l
 
 ## v0.53 user-provided shell artwork
 - `assets/skin/dorukcraft-user.png` is copied byte-for-byte from the user-provided `DorukCraftIcon.png`.
-- `assets/skin/sharps-playroom.png` is copied byte-for-byte from the user-provided Sharp's Playroom artwork.
-- No Sharp's Playroom game payload is bundled in the NO-GAMES shell update.
+- The older Sharp's Playroom debug artwork/tile was removed from the v0.66 distribution.
 
 
 ## v0.54
@@ -132,3 +131,9 @@ Shell restoration is original DorukStation code. Existing user-supplied system-a
 
 ## v0.59 reference pass
 Classic Home selection proportions were adjusted from user-supplied DorukStation/console reference photographs. No reference image is redistributed in this package.
+
+
+## v0.67 E-Controller networking
+- PeerJS 1.5.5 (`peerjs`) is loaded from jsDelivr at runtime for WebRTC peer/data-channel setup. PeerJS is MIT licensed.
+- PeerJS Cloud is used only as the signaling/rendezvous service in the GitHub Pages prototype; controller state is sent over the resulting WebRTC data connection.
+- DorukStation v0.67 device-role UI, pairing protocol, controller-state mapping, and OS integration code are original DorukStation code.

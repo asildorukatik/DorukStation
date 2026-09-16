@@ -1,0 +1,29 @@
+DorukStation Web v0.65 — OS SYNC / EXTERNAL MEDIA
+
+Base:
+- Exact DorukStation-Web-v0.64-FLOW-PANEL-PREVIEW-FULL.zip
+- Source SHA-256: 31a6826674dce12fc6c7b733a65a4b64f6879deb31adba697f26a2b77a2d5b0b
+
+Changes:
+- Preserves the v0.64 shell design and adds v65 as a final JS/CSS layer.
+- Adds DorukOS bridge handshake and live event sync for apps, Wi-Fi, Bluetooth,
+  controllers, storage, external media and install progress.
+- Requests trusted shell capabilities automatically.
+- Requests DualSense auto-connect/auto-pair policy from DorukStationOS.
+- Device-installed user apps can appear on Home and in Library.
+- System helper apps/runtimes (VLC, recorders, emulators, codecs) stay hidden.
+- Library: Add a Game replaces HTML-only wording.
+- HTML still runs directly in the browser preview. Native/ROM/ISO/package formats
+  are handed to DorukStationOS in the real kiosk build.
+- External USB/CD/ISO games appear on Home only while connected.
+- App Options includes Install To DorukStation and Eject for temporary games.
+- Successful install removes the temporary-media badge and makes the app eligible
+  for the Library.
+- Store and external installs use a clockwise circular reveal mask.
+- Supplied external/CD SVGs are stored under assets/system/media/.
+
+Preview:
+- Open normally to test the unchanged v0.64 shell with mock OS settings data.
+- Add ?mock=1 to the URL for visible mock device app + USB/CD demo entries.
+- In ?mock=1 mode: F8 inserts another USB game, F9 inserts a CD game,
+  F10 inserts an ISO game.

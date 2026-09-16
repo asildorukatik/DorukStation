@@ -1,0 +1,8 @@
+DorukStation Web v0.66 — Live Store Repository Sync
+
+- Store source of truth: asildorukatik/DorukStation-Game-Library
+- Loads catalog.json first using the official format=1/items manifest index.
+- Falls back to the repository README while catalog.json is not yet published.
+- Current README entries become live Store cards (DorukCraft, DorukCraft Dungeons).
+- Removed Sharp's Playroom from Modern debug Home injection and Store fallback/preinstalled state.
+- Existing v0.65 OS sync/external media behavior is retained.

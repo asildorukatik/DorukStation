@@ -22,7 +22,7 @@
     const id=String(target.id||'');
     const tag=String(target.tagName||'').toUpperCase();
     const type=String(target.type||'').toLowerCase();
-    return tag==='INPUT'&&type==='file'&&(id==='htmlPicker'||id==='backgroundPicker');
+    return tag==='INPUT'&&type==='file'&&(id==='htmlPicker'||id==='gamePicker'||id==='backgroundPicker');
   }
 
   function ownerAllows(owner,targetKind){

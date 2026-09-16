@@ -347,7 +347,7 @@
   function shouldRemoveLegacyBundledGame(app){return !!app&&app.id==='dorukcraft'&&!app.folderGame&&!app.userAdded&&!app.storeManaged}
   function decorateStoreShellApp(app){if(!app)return app;app.name='DorukStation Store';app.desc='Browse and install games from DorukStation Store.';app.live='Featured games, downloads and updates.';app.action='store';return app}
   function storeShellAppActivation(app){if(!app?.storeManaged)return 'default';return ['queued','downloading','verifying','extracting'].includes(app.installState)?'detail':'launch'}
-  function isStoreManagedPreinstalled(game){return String(game?.id||'')==='sharps-playroom'}
+  function isStoreManagedPreinstalled(game){return false}
   function installBrowser(){
     if(window.__ds57StoreInstalled)return;
     window.__ds57StoreInstalled=true;
@@ -358,8 +358,8 @@
     registerVfsServiceWorker();
 
     const runtime={
-      catalog:normalizeCatalog({games:[{id:'sharps-playroom',name:"Sharp's Playroom",version:'preinstalled',description:'Preinstalled DorukStation playroom.',age:'7+',genres:['Adventure'],icon:'assets/skin/sharps-playroom.png',featured:true}]},location.href),
-      installs:{'sharps-playroom':{state:'installed',preinstalled:true,version:'preinstalled'}},
+      catalog:normalizeCatalog({games:[]},location.href),
+      installs:{},
       gameOverrides:{},globalStorage:'browser',search:'',catalogError:'',filter:'',activeView:'',activeGameId:'',focusables:[],aborters:new Map(),refreshTimer:0
     };
     window.__dorukstationStore57=runtime;
@@ -376,14 +376,11 @@
       const catalogUrl=window.DORUKSTATION_STORE_CATALOG_URL||DEFAULT_CATALOG_URL;
       try{const res=await fetch(catalogUrl,{cache:'no-store'});if(!res.ok)throw new Error(`HTTP ${res.status}`);remote=normalizeCatalog(await res.json(),catalogUrl)}catch(err){runtime.catalogError=`Catalog offline: ${err?.message||err}`}
       if(remote){
-        const sharp=runtime.catalog.games.find(g=>g.id==='sharps-playroom');
         runtime.catalog=remote;
-        if(sharp&&!runtime.catalog.games.some(g=>g.id==='sharps-playroom'))runtime.catalog.games.unshift(sharp);
       }
       try{runtime.globalStorage=await getGlobalStorage()}catch{}
       for(const g of runtime.catalog.games){
         try{runtime.gameOverrides[g.id]=await getGameStorageOverride(g.id)}catch{runtime.gameOverrides[g.id]='inherit'}
-        if(g.id==='sharps-playroom'){runtime.installs[g.id]={state:'installed',preinstalled:true,version:g.version};continue}
         try{const rec=await getInstallRecord(g.id);if(rec){runtime.installs[g.id]={...rec,state:rec.version&&g.version&&rec.version!==g.version?'update-available':'installed'}}else if(!runtime.installs[g.id])runtime.installs[g.id]={state:'not-installed'}}catch{if(!runtime.installs[g.id])runtime.installs[g.id]={state:'not-installed'}}
       }
       if(storePageActive())renderPage();
@@ -470,9 +467,6 @@
       await startInstall(game);
     }
     function launchStoreGame(game){
-      if(game.id==='sharps-playroom'){
-        const idx=typeof apps!=='undefined'?apps.findIndex(a=>a.id==='sharps-playroom'):-1;if(idx>=0){while(S.pageOpen)backPage();S.zone='home';S.app=idx;render();activate();return}showStoreMessage("Sharp's Playroom is preinstalled, but its playable package is not attached to this shell yet.");return;
-      }
       const rec=runtime.installs[game.id];if(!rec||!['installed','update-available'].includes(rec.state)){showStoreMessage('Game is not installed.');return}
       if(!/^https?:$/.test(location.protocol)){showStoreMessage('Installed multi-file games launch from DorukStation on localhost or HTTPS.');return}
       syncStoreApps();const app=apps.find(a=>a.storeGameId===game.id);if(app){while(S.pageOpen)backPage();S.zone='home';S.app=apps.indexOf(app);render();activate()}
@@ -484,9 +478,9 @@
 
     function syncStoreApps(){
       if(typeof apps==='undefined')return;decorateStoreShellApp(apps.find(a=>a.id==='store'));
-      for(let i=apps.length-1;i>=0;i--){const a=apps[i];if((a?.storeManaged&&a.id!=='sharps-playroom')||shouldRemoveLegacyBundledGame(a))apps.splice(i,1)}
+      for(let i=apps.length-1;i>=0;i--){const a=apps[i];if(a?.storeManaged||shouldRemoveLegacyBundledGame(a))apps.splice(i,1)}
       for(const game of runtime.catalog.games){
-        if(game.id==='sharps-playroom')continue;const rec=runtime.installs[game.id];if(!rec||rec.state==='not-installed'||rec.state==='failed'||rec.state==='cancelled')continue;
+        const rec=runtime.installs[game.id];if(!rec||rec.state==='not-installed'||rec.state==='failed'||rec.state==='cancelled')continue;
         const existing=apps.find(a=>a.id===game.id);if(existing&&!existing.storeManaged)continue;
         const profileId=(()=>{try{return currentProfile?.id||'default'}catch{return'default'}})();
         const scope=(()=>{try{return navigator.serviceWorker?.controller?.scriptURL?new URL('./',navigator.serviceWorker.controller.scriptURL).href:new URL('./',location.href).href}catch{return location.href}})();

@@ -73,6 +73,9 @@ function v62HidePreloginSurfacesNow(){
  }
  S.userSelectOpen=false;S.createChoiceOpen=false;S.createUserOpen=false;S.avatarPickerOpen=false;
 }
+/* Later startup layers (v0.67+) need to participate in this state machine. */
+window.v62SetStartupPhase=v62SetStartupPhase;
+window.v62HidePreloginSurfacesNow=v62HidePreloginSurfacesNow;
 function v62RevealInputGate(){
  v62UserRevealPending=false;v62SetStartupPhase('input');
  S.userSelectOpen=false;

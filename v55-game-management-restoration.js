@@ -22,7 +22,7 @@
   function managementItems(folder){
     const f=normalizeFolder(folder);
     return [
-      {id:'add-custom-game',title:'Add Custom Game',note:'Choose a standalone .html game for this user.'},
+      {id:'add-custom-game',title:'Add a Game',note:'Choose a game file, package, ROM or ISO for this user.'},
       {id:'games-folder',title:'Games Folder',note:'Global installs: games/<game-name>/index.html (legacy games/*.html also works).'},
       {id:'user-folder',title:'User Folder',note:f}
     ];
@@ -42,7 +42,7 @@
     }
 
     window.v55OpenCustomGamePicker=function(){
-      const picker=document.querySelector('#htmlPicker');
+      const picker=document.querySelector('#gamePicker')||document.querySelector('#htmlPicker');
       try{if(!picker||typeof currentProfile==='undefined'||!currentProfile)return}catch{return}
       picker.dataset.mode='new';
       picker.click();
@@ -66,7 +66,7 @@
         {title:'User Folder',note:layout.user,disabled:true},
         {title:'Shell Settings',note:layout.shell,disabled:true},
         {title:'Game Save Namespace',note:layout.games+'<game-id>/',disabled:true},
-        {title:'Imported HTML Apps',note:layout.imported+'(session-local app list; saves remain user-scoped)',disabled:true}
+        {title:'Imported Games',note:layout.imported+'(session-local game/app list; saves remain user-scoped)',disabled:true}
       ]);
     };
 

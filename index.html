@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>DorukStation — v0.64</title>
+<title>DorukStation — v0.66</title>
 <link rel="stylesheet" href="app.css">
   <link rel="stylesheet" href="v58-store.css">
   <link rel="stylesheet" href="v58-whats-new.css">
@@ -12,6 +12,9 @@
   <link rel="stylesheet" href="v62-theme-surfaces-startup.css">
   <link rel="stylesheet" href="v63-background-preview.css">
   <link rel="stylesheet" href="v64-flow-panel-preview.css">
+  <link rel="stylesheet" href="v65-os-sync-external-media.css">
+  <link rel="stylesheet" href="v67-device-role-econtroller.css">
+  <link rel="stylesheet" href="v67-responsive-shell.css">
 </head>
 <body>
 <div id="viewport">
@@ -34,6 +37,76 @@
       <div class="boot-name">DorukStation</div>
     </div>
   </section>
+
+  <section id="deviceRoleGate" class="v67-overlay hidden" aria-label="Choose how to use this device">
+    <div class="v67-role-panel">
+      <img class="v67-role-logo" src="assets/branding/dorukstation-logo-bright.png" alt="DorukStation">
+      <p class="v67-kicker">DEVICE MODE</p>
+      <h1>How are you using this device?</h1>
+      <p class="v67-role-subtitle">Choose once for this session. Permanent DorukStation skips this screen next time.</p>
+      <div class="v67-role-options" role="group" aria-label="Device mode">
+        <button type="button" class="v67-role-option focused" data-v67-role="station">
+          <strong>DorukStation</strong><span>Use the full DorukStation interface on this device.</span>
+        </button>
+        <button type="button" class="v67-role-option" data-v67-role="controller">
+          <strong>E-Controller</strong><span>Turn this phone or tablet into a DorukStation controller.</span>
+        </button>
+        <div class="v67-role-divider"><span>OR</span></div>
+        <button type="button" class="v67-role-option v67-permanent" data-v67-role="permanent-station">
+          <strong>Permanent DorukStation</strong><span>Always boot as DorukStation. You can change this later in Settings.</span>
+        </button>
+      </div>
+      <small class="v67-role-hint">Touch, mouse, keyboard, or a connected controller can choose.</small>
+    </div>
+  </section>
+
+  <section id="eControllerPair" class="v67-overlay v67-controller-pair hidden" aria-label="Pair E-Controller">
+    <div class="v67-pair-panel">
+      <p class="v67-kicker">E-CONTROLLER</p>
+      <h1 id="eControllerPairTitle">Find a DorukStation</h1>
+      <p id="eControllerPairHelp">Searching automatically for browser-visible local DorukStations. For another device, use its six-digit Web code.</p>
+      <div class="v67-search-actions" role="group" aria-label="E-Controller discovery options">
+        <button id="eControllerRefreshLan" class="v67-search-button" type="button"><span aria-hidden="true">📶</span> Refresh LAN</button>
+        <button id="eControllerSearchBluetooth" class="v67-search-button v67-bluetooth-button" type="button"><span aria-hidden="true">ᛒ</span> Search Bluetooth</button>
+      </div>
+      <div id="eControllerPairStatus" class="v67-pair-status">Starting local search…</div>
+      <div id="eControllerDiscoveryResults" class="v67-discovery-list hidden" aria-live="polite"></div>
+      <div id="eControllerCodeFallback" class="v67-code-fallback">
+        <div class="v67-role-divider"><span>OR USE CODE</span></div>
+        <p>On another device, enter the six-digit E-Controller code shown on DorukStation Home.</p>
+        <form id="eControllerPairForm" autocomplete="off">
+          <input id="eControllerPairCode" inputmode="numeric" pattern="[0-9]*" maxlength="6" placeholder="000000" aria-label="Six digit pairing code">
+          <button id="eControllerConnectButton" type="submit">Connect</button>
+        </form>
+      </div>
+      <button id="eControllerBackToRoles" class="v67-text-button" type="button">Back</button>
+    </div>
+  </section>
+
+  <section id="eControllerApproval" class="v67-approval hidden" aria-label="E-Controller connection request">
+    <div class="v67-approval-card">
+      <p class="v67-kicker">E-CONTROLLER REQUEST</p>
+      <h2 id="eControllerApprovalTitle">Connect to Phone E-Controller?</h2>
+      <p id="eControllerApprovalText">This device wants to become a controller for DorukStation.</p>
+      <div class="v67-approval-actions">
+        <button id="eControllerDecline" type="button">Decline</button>
+        <button id="eControllerAccept" class="primary" type="button">Connect</button>
+      </div>
+    </div>
+  </section>
+
+  <div id="eControllerHostBadge" class="v67-host-badge hidden" aria-live="polite">
+    <span>E-Controller</span>
+    <strong id="eControllerHostCode">------</strong>
+    <small id="eControllerHostStationId" class="v67-host-station-id">DorukStation - ----</small>
+    <small id="eControllerHostStatus">Starting…</small>
+  </div>
+
+  <div id="eControllerLiveStatus" class="v67-controller-status hidden" aria-live="polite">E-Controller</div>
+
+  <button id="eControllerDisconnect" class="v67-disconnect-button hidden" type="button" aria-label="Hold 2 seconds to disconnect E-Controller">
+    <strong>Disconnect</strong><small>Hold 2 seconds to disconnect</small>
+  </button>
 
   <section id="controllerGate" class="hidden" aria-label="Connect a controller or begin DorukStation">
     <div class="controller-gate-panel">
@@ -192,6 +265,7 @@
     <pre id="debug" class="hidden"></pre>
 
     <input id="htmlPicker" type="file" accept=".html,.htm,text/html" class="hidden">
+    <input id="gamePicker" type="file" accept=".html,.htm,.zip,.dsgame,.dorukgame,.iso,.AppImage,.exe,.desktop,.jar,.sh,.x86_64,.gb,.gbc,.gba,.nes,.sfc,.smc,.n64,.z64,.v64,.nds,.3ds,.cia,.cue,.chd,.pbp,.cso,.wad,.rvz,.gcz,.elf" class="hidden">
     <input id="backgroundPicker" type="file" accept="image/*" class="hidden">
   </main>
   <!-- Game surface is viewport-level, not inside the 1920×1080 shell canvas.
@@ -265,6 +339,7 @@
   </section>
 </div>
 <script src="games/manifest.js"></script>
+<script src="v67-responsive-shell.js"></script>
 <script src="app.js"></script>
 <script src="v53-input-layer.js"></script>
 <script src="v54-shell-restoration.js"></script>
@@ -276,5 +351,8 @@
 <script src="v61-session-flow.js"></script>
 <script src="v62-theme-surfaces-startup.js"></script>
 <script src="v64-flow-panel-preview.js"></script>
+<script src="v65-os-sync-external-media.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.5/dist/peerjs.min.js"></script>
+<script src="v67-device-role-econtroller.js"></script>
 </body>
 </html>

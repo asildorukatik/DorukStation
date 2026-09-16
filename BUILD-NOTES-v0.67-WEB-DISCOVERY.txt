@@ -1,0 +1,19 @@
+DorukStation Web v0.67 — Web-first E-Controller discovery
+
+Changes:
+- Entering E-Controller starts local browser-visible discovery automatically.
+- Replaced the single search button with separate Refresh LAN and Search Bluetooth actions.
+- Unified discovery results can show LAN (web-local), Bluetooth, and Web badges.
+- The same four-letter station ID discovered through more than one transport is merged into one row.
+- Six-digit PeerJS/WebRTC pairing remains the cross-device static-web fallback.
+- Bluetooth discovery is feature-detected; browsers without Web Bluetooth show a clear fallback message.
+- Static GitHub Pages cannot perform unrestricted cross-device LAN scanning, so another phone/PC/Raspberry Pi should use the six-digit Web code unless a native DorukStationOS bridge is available.
+
+Preserved:
+- responsive shell/fullscreen-exit fix
+- station four-letter IDs
+- battery reporting
+- rumble feedback
+- two-second hold-to-disconnect
+- user selection
+- home-only host pairing UI

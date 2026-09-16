@@ -8,6 +8,7 @@
   }
 })(typeof globalThis!=='undefined'?globalThis:this,function(){
   const DEFAULT_CATALOG_URL='https://raw.githubusercontent.com/asildorukatik/DorukStation-Game-Library/main/catalog.json';
+  const DEFAULT_README_URL='https://raw.githubusercontent.com/asildorukatik/DorukStation-Game-Library/main/README.md';
   const INSTALL_STATES=new Set(['not-installed','queued','downloading','verifying','extracting','installed','failed','cancelled','update-available']);
 
   function slug(value){
@@ -17,6 +18,56 @@
   function absoluteUrl(value,base){
     if(!value)return '';
     try{return new URL(String(value),base||undefined).href}catch{return String(value)}
+  }
+  function stripSmartQuotes(value){
+    return String(value||'').trim().replace(/^[“”\"']+|[“”\"']+$/g,'').trim();
+  }
+  function splitCsv(value){return String(value||'').split(',').map(x=>x.trim()).filter(Boolean)}
+  function parseReadmeCatalog(markdown,baseUrl=DEFAULT_README_URL){
+    const games=[];const text=String(markdown||'');const blocks=text.match(/\[\s*[\s\S]*?\]/g)||[];
+    for(const block of blocks){
+      const fields={};
+      for(const line of block.slice(1,-1).split(/\r?\n/)){
+        const m=line.match(/^\s*([^:]+):\s*(.*)\s*$/);if(!m)continue;
+        fields[m[1].trim().toLowerCase()]=stripSmartQuotes(m[2]);
+      }
+      const name=fields.game||fields.name;if(!name)continue;
+      const gameFile=fields.gamefile||fields['game file']||'';
+      games.push({
+        id:slug(name),name,version:fields.version||'repo',description:fields.description||'',age:fields.age||'Everyone',
+        genres:splitCsv(fields.genre||fields.genres),icon:absoluteUrl(fields.logo||fields.icon||'',baseUrl),
+        packageUrl:absoluteUrl(gameFile,baseUrl),publisher:fields.publisher||'',players:fields.player||fields.players||'',
+        languages:splitCsv(fields['supported languages']||fields.languages),vr:fields.vr||'',sizeLabel:fields.size||'',
+        featured:games.length===0,tags:['repository-readme'],source:'repository-readme'
+      });
+    }
+    return normalizeCatalog({schemaVersion:1,updatedAt:'',games},baseUrl);
+  }
+  function repositoryIndexToCatalog(raw,baseUrl=DEFAULT_CATALOG_URL){
+    const source=raw&&typeof raw==='object'?raw:{};
+    if(Array.isArray(source.items)){
+      return normalizeCatalog({schemaVersion:Number(source.format)||1,updatedAt:source.updatedAt||'',games:source.items.map((item,i)=>({
+        id:`repo-item-${i+1}`,name:`Store item ${i+1}`,manifestUrl:absoluteUrl(item,baseUrl)
+      }))},baseUrl);
+    }
+    return normalizeCatalog(source,baseUrl);
+  }
+  function normalizeRepositoryManifest(raw,manifestUrl){
+    const m=raw&&typeof raw==='object'?raw:{};const payload=m.payload&&typeof m.payload==='object'?m.payload:{};
+    const packageType=String(m.packageType||'hosted');
+    return {
+      id:slug(m.id||m.name||'game'),name:String(m.name||m.title||m.id||'Game'),manifestUrl:String(manifestUrl||''),
+      version:String(m.version||'1.0.0'),description:String(m.description||''),descriptionUrl:absoluteUrl(m.descriptionFile||m.descriptionUrl||'',manifestUrl),
+      age:String(m.age||m.ageRating||'Everyone'),genres:Array.isArray(m.genres)?m.genres.map(String).filter(Boolean):splitCsv(m.genre||''),
+      icon:absoluteUrl(m.icon||m.logo||'logo.png',manifestUrl),banner:absoluteUrl(m.banner||'',manifestUrl),
+      screenshots:Array.isArray(m.screenshots)?m.screenshots.map(x=>absoluteUrl(x,manifestUrl)).filter(Boolean):[],
+      packageUrl:packageType==='hosted'?absoluteUrl(payload.source||m.packageUrl||m.package||'',manifestUrl):'',packageSize:Number(m.packageSize||m.downloadSize)||0,
+      sha256:String(m.sha256||payload.sha256||'').trim().toLowerCase(),entry:String(m.entry||payload.entry||'Game/index.html').replace(/\\/g,'/'),
+      featured:!!m.featured,tags:Array.isArray(m.tags)?m.tags.map(String).filter(Boolean):[],publisher:String(m.publisher||m.developer||''),
+      players:String(m.players||m.playerCount||''),languages:Array.isArray(m.languages)?m.languages.map(String).filter(Boolean):splitCsv(m.supportedLanguages||''),
+      vr:String(m.vr||m.vrSupport||''),sizeLabel:String(m.size||m.installSize||''),packageType,fileType:String(payload.fileType||m.fileType||''),
+      runtimeHandler:String(m.runtime?.handler||m.runtimeHandler||''),downloadLink:absoluteUrl(m.downloadLink||'',manifestUrl),source:'repository-manifest'
+    };
   }
   function normalizeCatalog(raw,baseUrl){
     const source=raw&&typeof raw==='object'?raw:{};
@@ -43,7 +94,11 @@
           sha256:String(g?.sha256||'').trim().toLowerCase(),
           entry:String(g?.entry||'Game/index.html').replace(/\\/g,'/'),
           featured:!!g?.featured,
-          tags:Array.isArray(g?.tags)?g.tags.map(String).filter(Boolean):[]
+          tags:Array.isArray(g?.tags)?g.tags.map(String).filter(Boolean):[],
+          publisher:String(g?.publisher||''),players:String(g?.players||g?.player||''),
+          languages:Array.isArray(g?.languages)?g.languages.map(String).filter(Boolean):splitCsv(g?.supportedLanguages||''),
+          vr:String(g?.vr||''),sizeLabel:String(g?.sizeLabel||g?.size||''),packageType:String(g?.packageType||''),
+          fileType:String(g?.fileType||''),runtimeHandler:String(g?.runtimeHandler||''),downloadLink:absoluteUrl(g?.downloadLink||'',baseUrl),source:String(g?.source||'')
         };
       })
     };
@@ -58,16 +113,31 @@
         const res=await fetcher(game.manifestUrl,{cache:'no-store'});
         if(!res||res.ok===false)throw new Error(`HTTP ${res?.status||'error'}`);
         const raw=await res.json();
-        const normalized=normalizeCatalog({schemaVersion:source.schemaVersion||2,games:[raw]},game.manifestUrl).games[0];
+        let normalized=(raw?.format||raw?.payload||raw?.packageType)?normalizeRepositoryManifest(raw,game.manifestUrl):normalizeCatalog({schemaVersion:source.schemaVersion||2,games:[raw]},game.manifestUrl).games[0];
+        if(normalized.descriptionUrl&&!normalized.description){
+          try{const d=await fetcher(normalized.descriptionUrl,{cache:'no-store'});if(d&&d.ok!==false)normalized={...normalized,description:await d.text()}}catch{}
+        }
         const merged={...game,...normalized,manifestUrl:game.manifestUrl};
         if(game.featured)merged.featured=true;
         if(game.tags?.length)merged.tags=[...new Set([...(normalized.tags||[]),...game.tags])];
         games.push(merged);
-      }catch(err){
-        games.push({...game,manifestError:String(err?.message||err)});
-      }
+      }catch(err){games.push({...game,manifestError:String(err?.message||err)})}
     }
     return {...source,games};
+  }
+  async function loadRepositoryCatalog({catalogUrl=DEFAULT_CATALOG_URL,readmeUrl=DEFAULT_README_URL,fetchFn}={}){
+    const fetcher=fetchFn||((...args)=>fetch(...args));let catalogError='';
+    try{
+      const res=await fetcher(catalogUrl,{cache:'no-store'});if(!res||res.ok===false)throw new Error(`HTTP ${res?.status||'error'}`);
+      const raw=await res.json();const indexed=repositoryIndexToCatalog(raw,catalogUrl);
+      return {catalog:await hydrateCatalogManifests(indexed,fetcher),source:'catalog.json',catalogError:''};
+    }catch(err){catalogError=`catalog.json unavailable (${err?.message||err})`}
+    try{
+      const res=await fetcher(readmeUrl,{cache:'no-store'});if(!res||res.ok===false)throw new Error(`HTTP ${res?.status||'error'}`);
+      const catalog=parseReadmeCatalog(await res.text(),readmeUrl);
+      if(!catalog.games.length)throw new Error('README contains no Store entries');
+      return {catalog,source:'README.md',catalogError:''};
+    }catch(err){throw new Error(`${catalogError}; README unavailable (${err?.message||err})`)}
   }
   const CATEGORY_ALIASES={featured:['featured','popular'],adventure:['adventure'],racing:['racing','race'],horror:['horror'],strategy:['strategy','puzzle','strategy-puzzles'],building:['building','build','sandbox'],fight:['fight','fighting','combat']};
   function filterCatalogByCategory(catalog,filter){
@@ -394,10 +464,10 @@
     if(typeof navigator==='undefined'||!navigator.serviceWorker||!/^https?:$/.test(location.protocol))return null;
     try{return await navigator.serviceWorker.register('v57-game-vfs-sw.js')}catch(err){console.warn('[DorukStation Store] service worker registration failed',err);return null}
   }
-  function shouldRemoveLegacyBundledGame(app){return !!app&&app.id==='dorukcraft'&&!app.folderGame&&!app.userAdded&&!app.storeManaged}
+  function shouldRemoveLegacyBundledGame(app){return false}
   function decorateStoreShellApp(app){if(!app)return app;app.name='DorukStation Store';app.desc='Browse and install games from DorukStation Store.';app.live='Featured games, downloads and updates.';app.action='store';return app}
   function storeShellAppActivation(app){if(!app?.storeManaged)return 'default';return ['queued','downloading','verifying','extracting'].includes(app.installState)?'detail':'launch'}
-  function isStoreManagedPreinstalled(game){return String(game?.id||'')==='sharps-playroom'}
+  function isStoreManagedPreinstalled(game){return false}
   function installBrowser(){
     if(window.__ds58StoreInstalled)return;
     window.__ds58StoreInstalled=true;
@@ -408,8 +478,8 @@
     registerVfsServiceWorker();
 
     const runtime={
-      catalog:normalizeCatalog({games:[{id:'sharps-playroom',name:"Sharp's Playroom",version:'preinstalled',description:'Preinstalled DorukStation playroom.',age:'7+',genres:['Adventure'],icon:'assets/skin/sharps-playroom.png',featured:true}]},location.href),
-      installs:{'sharps-playroom':{state:'installed',preinstalled:true,version:'preinstalled'}},
+      catalog:normalizeCatalog({games:[]},location.href),
+      installs:{},
       gameOverrides:{},globalStorage:'browser',search:'',catalogError:'',filter:'featured',activeView:'',activeGameId:'',focusables:[],aborters:new Map(),refreshTimer:0
     };
     window.__dorukstationStore58=runtime;
@@ -422,20 +492,16 @@
     const storePageActive=()=>!!(typeof S!=='undefined'&&S.pageOpen&&S.pageCustom&&S.pageCustom.__v57Store);
 
     async function refreshCatalog(){
-      let remote=null;runtime.catalogError='';
+      runtime.catalogError='';
       const catalogUrl=window.DORUKSTATION_STORE_CATALOG_URL||DEFAULT_CATALOG_URL;
-      try{const res=await fetch(catalogUrl,{cache:'no-store'});if(!res.ok)throw new Error(`HTTP ${res.status}`);remote=await hydrateCatalogManifests(normalizeCatalog(await res.json(),catalogUrl),fetch)}catch(err){runtime.catalogError=`Catalog offline: ${err?.message||err}`}
-      if(remote){
-        const sharp=runtime.catalog.games.find(g=>g.id==='sharps-playroom');
-        runtime.catalog=remote;
-        if(sharp&&!runtime.catalog.games.some(g=>g.id==='sharps-playroom'))runtime.catalog.games.unshift(sharp);
-      }
+      const readmeUrl=window.DORUKSTATION_STORE_README_URL||DEFAULT_README_URL;
+      try{const loaded=await loadRepositoryCatalog({catalogUrl,readmeUrl,fetchFn:fetch});runtime.catalog=loaded.catalog;runtime.catalogError=loaded.catalogError||'';runtime.catalogSource=loaded.source}catch(err){runtime.catalog=normalizeCatalog({games:[]},location.href);runtime.catalogError=`Store repository offline: ${err?.message||err}`;runtime.catalogSource='offline'}
       try{runtime.globalStorage=await getGlobalStorage()}catch{}
       for(const g of runtime.catalog.games){
         try{runtime.gameOverrides[g.id]=await getGameStorageOverride(g.id)}catch{runtime.gameOverrides[g.id]='inherit'}
-        if(g.id==='sharps-playroom'){runtime.installs[g.id]={state:'installed',preinstalled:true,version:g.version};continue}
         try{const rec=await getInstallRecord(g.id);if(rec){runtime.installs[g.id]={...rec,state:rec.version&&g.version&&rec.version!==g.version?'update-available':'installed'}}else if(!runtime.installs[g.id])runtime.installs[g.id]={state:'not-installed'}}catch{if(!runtime.installs[g.id])runtime.installs[g.id]={state:'not-installed'}}
       }
+      for(const id of Object.keys(runtime.installs)){if(!runtime.catalog.games.some(g=>g.id===id))delete runtime.installs[id]}
       if(storePageActive())renderPage();
       syncStoreApps();
       return runtime.catalog;
@@ -520,9 +586,6 @@
       await startInstall(game);
     }
     function launchStoreGame(game){
-      if(game.id==='sharps-playroom'){
-        const idx=typeof apps!=='undefined'?apps.findIndex(a=>a.id==='sharps-playroom'):-1;if(idx>=0){while(S.pageOpen)backPage();S.zone='home';S.app=idx;render();activate();return}showStoreMessage("Sharp's Playroom is preinstalled, but its playable package is not attached to this shell yet.");return;
-      }
       const rec=runtime.installs[game.id];if(!rec||!['installed','update-available'].includes(rec.state)){showStoreMessage('Game is not installed.');return}
       if(!/^https?:$/.test(location.protocol)){showStoreMessage('Installed multi-file games launch from DorukStation on localhost or HTTPS.');return}
       syncStoreApps();const app=apps.find(a=>a.storeGameId===game.id);if(app){while(S.pageOpen)backPage();S.zone='home';S.app=apps.indexOf(app);render();activate()}
@@ -534,9 +597,9 @@
 
     function syncStoreApps(){
       if(typeof apps==='undefined')return;decorateStoreShellApp(apps.find(a=>a.id==='store'));
-      for(let i=apps.length-1;i>=0;i--){const a=apps[i];if((a?.storeManaged&&a.id!=='sharps-playroom')||shouldRemoveLegacyBundledGame(a))apps.splice(i,1)}
+      for(let i=apps.length-1;i>=0;i--){const a=apps[i];if(a?.storeManaged||shouldRemoveLegacyBundledGame(a))apps.splice(i,1)}
       for(const game of runtime.catalog.games){
-        if(game.id==='sharps-playroom')continue;const rec=runtime.installs[game.id];if(!rec||rec.state==='not-installed'||rec.state==='failed'||rec.state==='cancelled')continue;
+        const rec=runtime.installs[game.id];if(!rec||rec.state==='not-installed'||rec.state==='failed'||rec.state==='cancelled')continue;
         const existing=apps.find(a=>a.id===game.id);if(existing&&!existing.storeManaged)continue;
         const profileId=(()=>{try{return currentProfile?.id||'default'}catch{return'default'}})();
         const scope=(()=>{try{return navigator.serviceWorker?.controller?.scriptURL?new URL('./',navigator.serviceWorker.controller.scriptURL).href:new URL('./',location.href).href}catch{return location.href}})();
@@ -595,5 +658,5 @@
 
     refreshCatalog();
   }
-  return {DEFAULT_CATALOG_URL,INSTALL_STATES,STORE_DB,Sha256,sha256Hex,slug,normalizeCatalog,hydrateCatalogManifests,filterCatalogByCategory,categoryLabel,isSafePackagePath,resolveStorageTarget,installStateLabel,virtualGameUrl,extractZipEntries,extractZipBlobEntries,storeAppFromGame,validatePackageEntries,formatBytes,formatEta,searchCatalog,progressPercent,homeDownloadLabel,renderTileProgressMarkup,renderStoreHomeMarkup,renderStoreSearchMarkup,renderDownloadsMarkup,renderGameDetailMarkup,renderSystemFooterMarkup,parseVirtualGamePath,mimeForPath,installMetaKey,gameFileKey,openStoreDb,idbGet,idbPut,idbDeletePrefix,getGlobalStorage,setGlobalStorage,getGameStorageOverride,setGameStorageOverride,getInstallRecord,saveInstallRecord,getStoredHandle,storeHandle,chooseUserFolder,ensureWritePermission,resolveFolderHandle,prepareBrowserGameWriter,prepareFolderGameWriter,writeBrowserGame,writeFolderGame,createTempPackageSink,downloadGamePackage,installGamePackage,cancelGameInstall,readInstalledGameFile,registerVfsServiceWorker,shouldRemoveLegacyBundledGame,decorateStoreShellApp,storeShellAppActivation,isStoreManagedPreinstalled,installBrowser};
+  return {DEFAULT_CATALOG_URL,DEFAULT_README_URL,INSTALL_STATES,STORE_DB,parseReadmeCatalog,repositoryIndexToCatalog,normalizeRepositoryManifest,loadRepositoryCatalog,Sha256,sha256Hex,slug,normalizeCatalog,hydrateCatalogManifests,filterCatalogByCategory,categoryLabel,isSafePackagePath,resolveStorageTarget,installStateLabel,virtualGameUrl,extractZipEntries,extractZipBlobEntries,storeAppFromGame,validatePackageEntries,formatBytes,formatEta,searchCatalog,progressPercent,homeDownloadLabel,renderTileProgressMarkup,renderStoreHomeMarkup,renderStoreSearchMarkup,renderDownloadsMarkup,renderGameDetailMarkup,renderSystemFooterMarkup,parseVirtualGamePath,mimeForPath,installMetaKey,gameFileKey,openStoreDb,idbGet,idbPut,idbDeletePrefix,getGlobalStorage,setGlobalStorage,getGameStorageOverride,setGameStorageOverride,getInstallRecord,saveInstallRecord,getStoredHandle,storeHandle,chooseUserFolder,ensureWritePermission,resolveFolderHandle,prepareBrowserGameWriter,prepareFolderGameWriter,writeBrowserGame,writeFolderGame,createTempPackageSink,downloadGamePackage,installGamePackage,cancelGameInstall,readInstalledGameFile,registerVfsServiceWorker,shouldRemoveLegacyBundledGame,decorateStoreShellApp,storeShellAppActivation,isStoreManagedPreinstalled,installBrowser};
 });

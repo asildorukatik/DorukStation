@@ -1,0 +1,72 @@
+DorukStation Web v0.67 — Device Roles + E-Controller
+
+WHAT CHANGED
+- Startup now asks whether the device is DorukStation, E-Controller, or Permanent DorukStation.
+- Permanent DorukStation persists locally and can be removed from Settings > Device Role.
+- Normal DorukStation uses the input that selected the role: touch = Mobile, keyboard/mouse = PC, gamepad = Controller. No controller is required.
+- Permanent DorukStation skips the role chooser but keeps a neutral "Press any input to play" gate; touch, keyboard/mouse, and gamepad all start valid sessions.
+- E-Controller uses the existing touch controller on a solid black background.
+- A station generates a six-digit pairing code. A phone on the same GitHub Pages build enters it.
+- PeerJS brokers the WebRTC connection; accepted controller input travels through a peer-to-peer DataChannel.
+- DorukStation asks before accepting each phone controller.
+- Accepted E-Controllers are injected into the existing Gamepad route and therefore reuse controller login/user ownership and game input.
+- Remote gamepad vibration is sent back to the phone through the same data channel.
+- Fixed the v0.62/v0.67 startup-state handoff so selecting a user always completes login and reveals Home/apps instead of leaving the shell stuck behind the controller gate.
+
+WEB VS NATIVE DORUKSTATIONOS
+- Browsers cannot expose a GitHub Pages tab as a Bluetooth gamepad peripheral, so v0.67 uses WebRTC for the web prototype.
+- The later native DorukStationOS build can provide Bluetooth E-Controller transport through the OS bridge without changing games' standard-gamepad view.
+- Node.js by itself is not an HTML/CSS renderer; the native OS will still need a lightweight web rendering engine plus the DorukOS bridge.
+
+TESTING
+- tests/v67-device-role-econtroller.test.cjs
+- tests/v66-repo-store.test.cjs
+- tests/v65-os-sync.test.cjs
+
+
+Patch — E-Controller discovery / visibility
+- Fixed blank E-Controller screen caused by hiding #viewport while the pairing UI lived inside it.
+- Added automatic same-browser tab discovery with Searching → Found → Connect UI.
+- Controller controls stay hidden until pairing is accepted.
+- Six-digit code remains available as the separate-device fallback.
+- Host pairing badge and incoming approval UI are Home-only; they do not cover games/apps.
+
+
+Patch — E-Controller battery + hold-to-disconnect
+- E-Controller reports the phone/tablet battery through the controller data channel when the browser exposes Battery Status API data.
+- The remote synthetic gamepad exposes that battery through DorukStation's existing controller battery path and the mock Devices snapshot.
+- Added a connected-only Disconnect control on the E-Controller. Hold it for 2 seconds to disconnect.
+- Pressing Disconnect immediately notifies DorukStation: “E-Controller <device> is disconnecting!”
+- Releasing before 2 seconds cancels the hold.
+- Completing the 2-second hold closes the controller and notifies DorukStation: “E-Controller <device> Disconnected”.
+- After disconnection the controller UI hides and the E-Controller returns to DorukStation discovery.
+- If Battery Status API is unavailable, DorukStation reports battery as unavailable instead of guessing.
+
+
+## Patch — manual DorukStation search + station IDs
+- E-Controller no longer treats unsolicited discovery broadcasts as a found DorukStation.
+- Discovery begins only after **Search for DorukStation** is pressed. Each search uses a fresh nonce and protocol v2; stale/legacy replies are ignored.
+- Search results are shown as a list with a **Connect** button beside every discovered DorukStation.
+- DorukStation Home now shows a four-letter identity such as **DorukStation - QFRA** below the six-digit E-Controller code.
+- Same-origin web discovery resolves duplicate four-letter IDs during an active search. Native DorukStationOS will additionally check Bluetooth/BlueZ advertisements before claiming an ID; a static GitHub Pages page cannot scan arbitrary Bluetooth names in the background.
+- If no station answers, E-Controller shows **No DorukStations found** and **Search Again**; the six-digit code remains available for phone ↔ laptop pairing.
+
+
+## Patch — responsive shell + E-Controller control placement
+- Wide displays keep the original contained 1920×1080 DorukStation shell.
+- Compact, square, short-landscape, and portrait displays switch the shell to the real viewport instead of shrinking the 16:9 canvas and leaving large blank areas.
+- Quick actions move to the top with viewport-aware icon sizing; Home app tiles become larger and the title/detail/live area reflows vertically.
+- Function pages, page grids, right-side menus, Quick Menu, and Share surfaces gain compact/portrait sizing so they remain usable on narrow screens.
+- Full-screen games remain on their existing live viewport path and are not forced into the responsive shell layout.
+- The E-Controller Disconnect control is now centered directly below the connection/battery status instead of occupying the upper-right shoulder-button area.
+
+Responsive Classic focus/carousel patch:
+- Classic focus frame now derives its width/height from the responsive focused tile instead of retaining the fixed v0.59 263x319 frame.
+- Home carousel keeps part of the immediately previous app visible on the left while navigating.
+- Compact and portrait layouts add 22 px more separation between the quick-action row and the app carousel, with downstream Home content shifted to preserve spacing.
+
+Fullscreen exit responsive fix:
+- Wide-but-short browser viewports (aspect ratio > 2.0) use Compact shell geometry.
+- Responsive sizing prefers visualViewport dimensions when available.
+- visualViewport resize events trigger shell recalculation.
+- fullscreen transitions remeasure at 30ms, 120ms, and 300ms so browser chrome changes settle before final layout.

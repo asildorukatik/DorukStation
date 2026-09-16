@@ -59,7 +59,7 @@ let apps=[
  {id:"shareplay",name:"Share Play",desc:"Share Play-style placeholder.",image:"assets/skin/flow/content/shareplay.png",type:"image",action:"placeholder",live:"A native network implementation can be connected later."},
  {id:"usbmusic",name:"USB Music Player",desc:"USB media player placeholder.",image:"assets/skin/flow/content/usbmusic.png",type:"image",action:"placeholder",live:"Native DorukStation can scan removable media later."},
  {id:"disc",name:"Disc",desc:"Disc/game-media placeholder.",image:"assets/skin/flow/content/disc.png",type:"image",action:"placeholder",live:"Disc detection belongs in the native build."},
- {id:"library",name:"Library",desc:"All games and applications, plus Add HTML App.",image:"assets/skin/flow/content/library.png",type:"image",action:"library",live:"Library is always the far-right Home item."}
+ {id:"library",name:"Library",desc:"All games and applications, plus Add a Game.",image:"assets/skin/flow/content/library.png",type:"image",action:"library",live:"Library is always the far-right Home item."}
 ];
 
 /* ===== v0.25 games-folder registry =====
@@ -292,18 +292,25 @@ window.addEventListener("message",e=>{if(e?.data?.type==="dorukstation:guest-db"
    The 1920x1080 controls are always fully visible, while #viewport fills
    any extra side/top space with the same animated theme instead of bars. */
 function scaleStage(){
- const scale=Math.min(innerWidth/1920,innerHeight/1080);
  const stage=$("#stage");
- stage.style.transform=`translate(-50%,-50%) scale(${scale})`;
- document.documentElement.style.setProperty("--stage-scale",String(scale));
- document.documentElement.style.setProperty("--stage-visible-width",`${1920*scale}px`);
- document.documentElement.style.setProperty("--stage-visible-height",`${1080*scale}px`);
+ const responsive=window.DorukResponsiveShell;
+ const viewportWidth=Number(window.visualViewport?.width)||innerWidth;
+ const viewportHeight=Number(window.visualViewport?.height)||innerHeight;
+ const fallbackScale=Math.min(viewportWidth/1920,viewportHeight/1080);
+ const metrics=responsive?.stageMetrics?window.DorukResponsiveShell.stageMetrics(viewportWidth,viewportHeight):{mode:"wide",width:1920,height:1080,scale:fallbackScale,left:"50%",top:"50%",transform:`translate(-50%,-50%) scale(${fallbackScale})`,origin:"center center",visibleWidth:1920*fallbackScale,visibleHeight:1080*fallbackScale};
+ document.body.classList.remove("shell-layout-wide","shell-layout-compact","shell-layout-portrait");
+ document.body.classList.add(`shell-layout-${metrics.mode}`);
+ stage.style.left=metrics.left;stage.style.top=metrics.top;stage.style.width=`${metrics.width}px`;stage.style.height=`${metrics.height}px`;stage.style.transformOrigin=metrics.origin;stage.style.transform=metrics.transform;
+ document.documentElement.style.setProperty("--stage-scale",String(metrics.scale));
+ document.documentElement.style.setProperty("--stage-visible-width",`${metrics.visibleWidth}px`);
+ document.documentElement.style.setProperty("--stage-visible-height",`${metrics.visibleHeight}px`);
 }
 function onViewportResize(){
  scaleStage();
  broadcastGameResolution();
 }
 addEventListener("resize",onViewportResize,{passive:true});
+if(window.visualViewport)visualViewport.addEventListener("resize",onViewportResize,{passive:true});
 addEventListener("orientationchange",()=>setTimeout(onViewportResize,80),{passive:true});
 scaleStage();
 
@@ -330,6 +337,8 @@ async function requestEntryFullscreen(){
 document.addEventListener("fullscreenchange",()=>{
  if(document.fullscreenElement)firstEntryFullscreenArmed=false;
  setTimeout(onViewportResize,30);
+ setTimeout(onViewportResize,120);
+ setTimeout(onViewportResize,300);
 });
 
 function themeLabel(){
@@ -386,6 +395,14 @@ function appInner(a){
  if(a.type==="files")return `<div class="files-mark"><div class="folder-shape"></div></div>`;
  return "";
 }
+function v67ApplyCarouselPeek(c,focusedTile,index){
+ const focusedOffset=focusedTile?focusedTile.offsetLeft:(Number(index)||0)*160;
+ const previousTile=Number(index)>0?c.children[Number(index)-1]:null;
+ const mode=document.body.classList.contains("shell-layout-portrait")?"portrait":(document.body.classList.contains("shell-layout-compact")?"compact":"wide");
+ const offset=window.DorukResponsiveShell?.carouselTranslateOffset?window.DorukResponsiveShell.carouselTranslateOffset(focusedOffset,previousTile?.offsetWidth||0,mode,Number(index)||0):focusedOffset;
+ c.style.transform=`translateX(${-offset}px)`;
+}
+
 function renderHome(){
  const c=$("#appCarousel");
  const startBox=$("#startBox");
@@ -396,8 +413,7 @@ function renderHome(){
  $$(".app-tile").forEach(el=>el.onclick=()=>{S.zone="home";S.app=Number(el.dataset.i);render();activate()});
  const focusedTile=c.querySelector(".app-tile.focused") || c.children[S.app];
  if(startBox&&focusedTile)focusedTile.appendChild(startBox);
- const focusedOffset=focusedTile ? focusedTile.offsetLeft : (S.app*160);
- c.style.transform=`translateX(${-focusedOffset}px)`;
+ v67ApplyCarouselPeek(c,focusedTile,S.app);
  const a=apps[S.app]||apps[0],running=runningApps.has(a.id);
  $("#appTitle").textContent=a.name;$("#appDescription").textContent=a.desc;$("#widgetBody").textContent=a.live||a.desc;
  const canStart=S.zone==="home"&&(["news","browser","gallery","explorer","pick","remote","launch","library","placeholder"].includes(a.action)||running);
@@ -448,10 +464,10 @@ function activateApp(app){
  if(!app)return;selectSound();
  if(runningApps.has(app.id))return resumeApp(app.id);
  switch(app.action){
-   case"news":openSimpleHomePage("What's New","Recent DorukStation activity.","assets/skin/now.png",[{title:"No recent activity",note:"Launch games or add a local HTML app to populate this area."}]);break;
+   case"news":openSimpleHomePage("What's New","Recent DorukStation activity.","assets/skin/now.png",[{title:"No recent activity",note:"Launch games or add a local game to populate this area."}]);break;
    case"browser":openBrowserPage();break;
    case"gallery":openGalleryPage();break;
-   case"explorer":openSimpleHomePage("File Explorer","Browser security limits direct filesystem browsing.","assets/skin/flow/content/library.png",[{title:"Use Library → Add HTML App",note:"Local standalone HTML games can be attached with the browser file picker."}]);break;
+   case"explorer":openSimpleHomePage("File Explorer","Browser security limits direct filesystem browsing.","assets/skin/flow/content/library.png",[{title:"Use Library → Add a Game",note:"Games can be added from DorukStationOS or the browser preview picker."}]);break;
    case"pick":$("#htmlPicker").dataset.mode="replace";$("#htmlPicker").click();break;
    case"remote":requestAppLaunch(app);break;
    case"launch":requestAppLaunch(app);break;
@@ -578,7 +594,7 @@ function openSettingsPage(){
   {title:"Devices",icon:"assets/skin/flow/function/setting.png",note:"Controllers",action:openControllerPage},
   {title:"Storage",icon:"▤",action:()=>openPage({title:"Storage",subtitle:`User folder: ${folderForProfile(currentProfile)}`,items:[{title:"User Folder",note:folderForProfile(currentProfile),disabled:true},{title:"Storage is managed by your browser",note:"Each user uses an isolated DorukStation folder namespace",disabled:true}]},true)},
   {title:"Themes",icon:"✦",note:themeLabel(),action:openThemeRootPage},
-  {title:"Application Saved Data Management",icon:"▥",note:"Per-user",action:()=>openPage({title:"Application Saved Data Management",subtitle:`Saved data for ${S.username}.`,items:[{title:"DorukCraft",note:"Stored separately for this user",disabled:true},{title:"Local HTML games",note:"Each app receives a separate user namespace",disabled:true}]},true)},
+  {title:"Application Saved Data Management",icon:"▥",note:"Per-user",action:()=>openPage({title:"Application Saved Data Management",subtitle:`Saved data for ${S.username}.`,items:[{title:"DorukCraft",note:"Stored separately for this user",disabled:true},{title:"Local games",note:"Each app receives a separate user namespace",disabled:true}]},true)},
   {title:"Sound and Screen",icon:"♪",action:openSoundScreenPage},
   {title:"System",icon:"⬡",action:openSystemSettingsPage},
   {title:"Initialization",icon:"◌",action:()=>openPage({title:"Initialization",subtitle:"System reset tools are intentionally protected.",items:[{title:"Restart DorukStation",action:()=>{if(currentProfile?.guest)cleanupGuestSession("restart");location.reload()}},{title:"Replay Startup",action:()=>{backPage();replayBoot()}},{title:"User data reset",note:"Not exposed here to prevent accidental save loss",disabled:true}]},true)}
@@ -606,8 +622,8 @@ function openBrowserPage(){openPage({title:"Internet Browser",subtitle:"External
 function openGalleryPage(){openPage({title:"Capture Gallery",subtitle:"Screenshots and recordings.",icon:"assets/skin/flow/content/gallery.png",returnZone:"home",mode:"grid",cols:3,items:[{title:"Screenshots",note:"0",disabled:true},{title:"Video Clips",note:"0",disabled:true},{title:"Recording integration",note:"Native build later",disabled:true}]})}
 function openLibraryPage(){
  const items=apps.filter(a=>a.id!=="library").map(a=>({title:a.name,note:a.userAdded?"Local HTML":"Home item",image:a.image,action:()=>{backPage();S.zone="home";S.app=apps.indexOf(a);render()}}));
- items.push({title:"Add HTML App",note:"Choose a standalone .html file",image:"assets/skin/add.png",action:()=>{$("#htmlPicker").dataset.mode="new";$("#htmlPicker").click()}});
- openPage({title:"Library",subtitle:"All games and applications. Add HTML App lives here, not on Home.",icon:"assets/skin/flow/content/library.png",returnZone:"home",mode:"grid",cols:4,items});
+ items.push({title:"Add a Game",note:"Choose a game file or package",image:"assets/skin/add.png",action:()=>window.v65OpenGamePicker?.()});
+ openPage({title:"Library",subtitle:"All games and applications. Add a Game lives here, not on Home.",icon:"assets/skin/flow/content/library.png",returnZone:"home",mode:"grid",cols:4,items});
 }
 
 /* ===== local HTML apps ===== */
@@ -1349,7 +1365,7 @@ function requestAppLaunch(app){const current=getRunningEntry();if(!current)retur
 const _v16ResumeApp=resumeAppV15;
 function resumeApp(id){const e=runningApps.get(id);if(!e)return;if(e.profileId&&currentProfile?.id!==e.profileId){const p=profileById(e.profileId);pushSystemNotification("",`${e.app.name} belongs to ${e.profileName||"another user"}`,p?`Switch to ${p.name} to continue.`:"Switch users to continue.",p||currentProfile);return}_v16ResumeApp(id)}
 function renderHome(){
- const c=$("#appCarousel"),startBox=$("#startBox");if(startBox&&c.contains(startBox))$("#homeArea").appendChild(startBox);c.innerHTML=apps.map((a,i)=>{const re=runningApps.get(a.id),mine=re?.profileId===currentProfile?.id;return `<div class="app-tile ${S.zone==="home"&&S.app===i&&!S.pageOpen?"focused":""} ${mine?"running":""}" data-i="${i}"><div class="app-icon">${appInner(a)}</div><div class="app-running-dot"></div></div>`}).join("");$$(".app-tile").forEach(el=>el.onclick=()=>{S.zone="home";S.app=Number(el.dataset.i);render();activate()});const focusedTile=c.querySelector(".app-tile.focused")||c.children[S.app];if(startBox&&focusedTile)focusedTile.appendChild(startBox);const focusedOffset=focusedTile?focusedTile.offsetLeft:(S.app*160);c.style.transform=`translateX(${-focusedOffset}px)`;const a=apps[S.app]||apps[0],re=runningApps.get(a.id),running=!!re&&re.profileId===currentProfile?.id;$("#appTitle").textContent=a.name;$("#appDescription").textContent=a.desc;$("#widgetBody").textContent=re&&!running?`${a.live||a.desc} Running for ${re.profileName||"another user"}.`:a.live||a.desc;const canStart=S.zone==="home"&&(["news","browser","gallery","explorer","pick","remote","launch","library","placeholder"].includes(a.action)||running);document.body.classList.toggle("can-start",canStart);const startLabel=running?"Resume":((a.action==="launch"||a.action==="remote")?"Play":"Open");$("#startBoxText").textContent=startLabel;$("#startBox").setAttribute("aria-label",`${startLabel} ${a.name}`);$("#runningLabel").classList.toggle("hidden",!running)
+ const c=$("#appCarousel"),startBox=$("#startBox");if(startBox&&c.contains(startBox))$("#homeArea").appendChild(startBox);c.innerHTML=apps.map((a,i)=>{const re=runningApps.get(a.id),mine=re?.profileId===currentProfile?.id;return `<div class="app-tile ${S.zone==="home"&&S.app===i&&!S.pageOpen?"focused":""} ${mine?"running":""}" data-i="${i}"><div class="app-icon">${appInner(a)}</div><div class="app-running-dot"></div></div>`}).join("");$$(".app-tile").forEach(el=>el.onclick=()=>{S.zone="home";S.app=Number(el.dataset.i);render();activate()});const focusedTile=c.querySelector(".app-tile.focused")||c.children[S.app];if(startBox&&focusedTile)focusedTile.appendChild(startBox);v67ApplyCarouselPeek(c,focusedTile,S.app);const a=apps[S.app]||apps[0],re=runningApps.get(a.id),running=!!re&&re.profileId===currentProfile?.id;$("#appTitle").textContent=a.name;$("#appDescription").textContent=a.desc;$("#widgetBody").textContent=re&&!running?`${a.live||a.desc} Running for ${re.profileName||"another user"}.`:a.live||a.desc;const canStart=S.zone==="home"&&(["news","browser","gallery","explorer","pick","remote","launch","library","placeholder"].includes(a.action)||running);document.body.classList.toggle("can-start",canStart);const startLabel=running?"Resume":((a.action==="launch"||a.action==="remote")?"Play":"Open");$("#startBoxText").textContent=startLabel;$("#startBox").setAttribute("aria-label",`${startLabel} ${a.name}`);$("#runningLabel").classList.toggle("hidden",!running)
 }
 
 /* Limit same-origin games to the controller assigned to the account that owns
@@ -2512,9 +2528,9 @@ launchApp=async function(app){
 
 /* Update Library wording so folder-installed games are easy to identify. */
 openLibraryPage=function(){
- const items=apps.filter(a=>a.id!=="library").map(a=>({title:a.name,note:a.folderGame?"Games folder":a.userAdded?"Imported HTML":"Home item",image:a.image,action:()=>{backPage();S.zone="home";S.app=apps.indexOf(a);render()}}));
- items.push({title:"Add HTML App",note:"Choose a standalone .html file",image:"assets/skin/add.png",action:()=>{$("#htmlPicker").dataset.mode="new";$("#htmlPicker").click()}});
- openPage({title:"Library",subtitle:"Games in games/ are indexed by refresh-games.py. Imported HTML apps are session-local.",icon:"assets/skin/flow/content/library.png",returnZone:"home",mode:"grid",cols:4,items});
+ const items=apps.filter(a=>a.id!=="library").map(a=>({title:a.name,note:a.folderGame?"Games folder":a.userAdded?"Imported game":"Home item",image:a.image,action:()=>{backPage();S.zone="home";S.app=apps.indexOf(a);render()}}));
+ items.push({title:"Add a Game",note:"Choose a game file or package",image:"assets/skin/add.png",action:()=>window.v65OpenGamePicker?.()});
+ openPage({title:"Library",subtitle:"Games in games/ are indexed by refresh-games.py. Imported games are session-local.",icon:"assets/skin/flow/content/library.png",returnZone:"home",mode:"grid",cols:4,items});
 };
 
 /* Update debug/version text. */
@@ -3037,7 +3053,7 @@ const v37ActivateAppStoreBase=activateApp;
 activateApp=function(app){if(app?.id==='store'||app?.action==='store'){selectSound();v37OpenStorePage('home');return}return v37ActivateAppStoreBase(app)};
 function v37OpenSystemAppsPage(){openPage({title:'System Apps',subtitle:'Utilities that do not need permanent Home tiles.',icon:'assets/skin/flow/function/setting.png',items:[
  {title:'Capture Gallery',icon:'assets/skin/flow/content/gallery.png',action:()=>openPage({title:'Capture Gallery',subtitle:'Screenshots and recordings.',icon:'assets/skin/flow/content/gallery.png',mode:'grid',cols:3,items:[{title:'Screenshots',note:'0',disabled:true},{title:'Video Clips',note:'0',disabled:true},{title:'Recording integration',note:'Native build later',disabled:true}]},true)},
- {title:'File Explorer',icon:'assets/skin/flow/content/library.png',action:()=>openPage({title:'File Explorer',subtitle:'Browser security limits direct filesystem browsing.',icon:'assets/skin/flow/content/library.png',items:[{title:'Open Library',note:'Add or launch HTML apps',action:()=>{while(S.pageOpen)backPage();S.zone='home';ensureLibraryLast();S.app=apps.findIndex(a=>a.id==='library');render()}},{title:'Native filesystem access',note:'Planned for a native DorukStation build',disabled:true}]},true)},
+ {title:'File Explorer',icon:'assets/skin/flow/content/library.png',action:()=>openPage({title:'File Explorer',subtitle:'Browser security limits direct filesystem browsing.',icon:'assets/skin/flow/content/library.png',items:[{title:'Open Library',note:'Add or launch games and apps',action:()=>{while(S.pageOpen)backPage();S.zone='home';ensureLibraryLast();S.app=apps.findIndex(a=>a.id==='library');render()}},{title:'Native filesystem access',note:'Planned for a native DorukStation build',disabled:true}]},true)},
  {title:'USB Music Player',icon:'assets/skin/flow/content/usbmusic.png',action:()=>openPage({title:'USB Music Player',subtitle:'Removable-media music player.',icon:'assets/skin/flow/content/usbmusic.png',items:[{title:'No USB music source connected',note:'Native removable-media scanning comes later',disabled:true}]},true)},
  {title:'Disc',icon:'assets/skin/flow/content/disc.png',action:()=>openPage({title:'Disc',subtitle:'Physical game/media support.',icon:'assets/skin/flow/content/disc.png',items:[{title:'No disc detected',note:'Disc detection belongs in the native build',disabled:true}]},true)}
 ]},true)}
@@ -3666,7 +3682,7 @@ function v40HeroDataFor(item){
  const banners=Array.isArray(item.banners)?item.banners:[];
  if(item.id==='store')return {title:'DorukStation Store',desc:'Browse games and applications with a more PS5-like featured look.',art:'assets/themes/tron.jpg',shelf:[{title:'Featured',note:'Store spotlight',image:'assets/skin/store.png'},{title:'Recently Added',note:'New on DorukStation',image:(apps.find(a=>a.id==='dorukcraft-dungeons')||item).image||'assets/skin/store.png'},{title:'Game Library',note:'Installed games',image:'assets/skin/flow/content/library.png'}]};
  if(item.id==='whatsnew')return {title:item.name,desc:'Recent games, activity and DorukStation updates.',art:'assets/themes/horizon.jpg',shelf:[{title:'Recently Played',note:'Your latest games',image:(v40GameHomeItems().find(a=>a.id==='dorukcraft')||item).image||item.image},{title:'Official News',note:'System updates',image:'assets/skin/now.png'},{title:'Capture Gallery',note:'Recent clips',image:'assets/skin/flow/content/gallery.png'}]};
- if(item.id==='library')return {title:'Game Library',desc:'Browse installed games, applications and imported HTML apps.',art:'assets/themes/destiny.jpg',shelf:v40GameHomeItems().filter(a=>a.id!=='library').slice(0,6).map(a=>({title:a.name,note:a.folderGame?'Games folder':a.userAdded?'Imported HTML':'Installed',image:a.image||V40_ALL_APPS_ICON}))};
+ if(item.id==='library')return {title:'Game Library',desc:'Browse installed games, applications and imported games.',art:'assets/themes/destiny.jpg',shelf:v40GameHomeItems().filter(a=>a.id!=='library').slice(0,6).map(a=>({title:a.name,note:a.folderGame?'Games folder':a.userAdded?'Imported game':'Installed',image:a.image||V40_ALL_APPS_ICON}))};
  if(item.id==='dorukcraft')return {title:'DorukCraft',desc:item.desc,art:banners[0]||'assets/themes/anniversary.jpg',shelf:[{title:'Play',note:'Resume crafting',image:item.image||V40_DISCOVER_ICON},{title:'Library',note:'Other installed games',image:'assets/skin/flow/content/library.png'},{title:'Store',note:'Browse more',image:'assets/skin/store.png'}]};
  if(banners.length)return {title:item.name,desc:item.desc||item.live||'',art:banners[0],shelf:banners.map((src,i)=>({title:`Preview ${i+1}`,note:item.name,image:src})).slice(0,6)};
  return {title:item.name,desc:item.desc||item.live||'',art:item.image||'assets/themes/battlefield.jpg',shelf:[{title:item.name,note:'Selected item',image:item.image||V40_DISCOVER_ICON}]};
@@ -3710,8 +3726,7 @@ renderHome=function(...args){
  c.querySelectorAll('.app-tile').forEach(el=>el.onclick=()=>{S.zone='home';S.app=Number(el.dataset.i);render()});
  const focusedTile=c.querySelector('.app-tile.focused')||c.children[S.app];
  if(startBox&&focusedTile)focusedTile.appendChild(startBox);
- const focusedOffset=focusedTile?focusedTile.offsetLeft:(S.app*160);
- c.style.transform=`translateX(${-focusedOffset}px)`;
+ v67ApplyCarouselPeek(c,focusedTile,S.app);
  const a=items[S.app],re=runningApps.get(a.id),running=!!re&&re.profileId===currentProfile?.id;
  document.querySelector('#appTitle').textContent=(S.homeSection==='media'&&a.heroTitle)?a.heroTitle:a.name;
  document.querySelector('#appDescription').textContent=(S.homeSection==='media'&&a.heroText)?a.heroText:(a.desc||a.live||'');
@@ -3815,8 +3830,8 @@ function v40RenderLibrary(body){
 }
 
 openLibraryPage=function(){
- const items=apps.filter(a=>a.id!=='library').map(a=>({title:a.name,note:a.folderGame?'Games folder':a.userAdded?'Imported HTML':'Installed',image:a.image||V40_ALL_APPS_ICON,action:()=>{backPage();S.zone='home';S.homeSection='games';S.app=Math.max(0,v40GameHomeItems().findIndex(x=>x.id===a.id));render()}}));
- items.push({title:'Add HTML App',note:'Choose a standalone .html file',image:'assets/skin/add.png',action:()=>{document.querySelector('#htmlPicker').dataset.mode='new';document.querySelector('#htmlPicker').click()}});
+ const items=apps.filter(a=>a.id!=='library').map(a=>({title:a.name,note:a.folderGame?'Games folder':a.userAdded?'Imported game':'Installed',image:a.image||V40_ALL_APPS_ICON,action:()=>{backPage();S.zone='home';S.homeSection='games';S.app=Math.max(0,v40GameHomeItems().findIndex(x=>x.id===a.id));render()}}));
+ items.push({title:'Add a Game',note:'Choose a game file or package',image:'assets/skin/add.png',action:()=>window.v65OpenGamePicker?.()});
  openPage({title:'Library',subtitle:v40CanUseModernHome()?'Browse installed games and applications.':'Games, applications and purchases.',icon:'assets/skin/flow/content/library.png',returnZone:'home',mode:'grid',cols:5,items,renderCustom:v40RenderLibrary});
 };
 
@@ -3927,12 +3942,12 @@ document.title='DorukStation — v0.41';
  function v41BuildLibraryItems(){
   const items=apps.filter(a=>a.id!=='library').map(a=>({
    title:a.name,
-   note:a.folderGame?'Games folder':a.userAdded?'Imported HTML':'Installed',
+   note:a.folderGame?'Games folder':a.userAdded?'Imported game':'Installed',
    image:a.image||V40_ALL_APPS_ICON,
    kind:a.userAdded?'imported':(a.folderGame?'folder':(/dorukcraft|dungeons|flappy/i.test(a.id+' '+a.name)?'game':'app')),
    action:()=>{while(S.pageOpen)backPage();S.zone='home';S.homeSection='games';const idx=v40GameHomeItems().findIndex(x=>x.id===a.id);S.app=Math.max(0,idx);render()}
   }));
-  items.push({title:'Add Custom Game',note:'Choose a standalone .html game for this user',image:'assets/skin/add.png',kind:'app',action:()=>window.v55OpenCustomGamePicker?.()});
+  items.push({title:'Add a Game',note:'Choose a game file, package, ROM or ISO for this user',image:'assets/skin/add.png',kind:'app',action:()=>window.v55OpenCustomGamePicker?.()});
   items.push({title:'Games Folder',note:'Manage global game installs and per-game folders',image:'assets/skin/flow/content/library.png',kind:'folder',action:()=>window.v55OpenGamesFolderInfo?.()});
   items.push({title:'User Folder',note:'Open this user\'s isolated shell and save namespaces',image:'assets/skin/flow/function/profile.png',kind:'folder',action:()=>window.v55OpenUserFolderInfo?.()});
   items.push({title:'PlayStation Plus',note:'Subscription area placeholder',image:'assets/skin/plus.png',kind:'plus',disabled:true});
@@ -4695,26 +4710,6 @@ window.__dorukstationVersion='0.53';
 document.title='DorukStation — v0.53';
 
 const V53_DORUKCRAFT_ICON='assets/skin/dorukcraft-user.png';
-const V53_SHARPS_PLAYROOM_ICON='assets/skin/sharps-playroom.png';
-
-function v53SharpsPlayroomApp(){
- const manifest=Array.isArray(window.DorukStationGameManifest)?window.DorukStationGameManifest:[];
- const found=manifest.find(g=>{
-  const text=`${g?.id||''} ${g?.name||''} ${g?.title||''} ${g?.file||''}`.toLowerCase();
-  return /sharp.?s/.test(text)&&/(playroom|playground)/.test(text);
- });
- if(found&&typeof dsFolderGameApp==='function'){
-  const app=dsFolderGameApp(found);
-  return {...app,id:'sharps-playroom',name:"Sharp's Playroom",image:V53_SHARPS_PLAYROOM_ICON,type:'image',modernOnly:true};
- }
- return {
-  id:'sharps-playroom',name:"Sharp's Playroom",
-  desc:"Sharp's Playroom — Modern DorukStation showcase.",
-  live:'Modern-mode showcase tile. The NO-GAMES shell keeps the game payload outside this update.',
-  image:V53_SHARPS_PLAYROOM_ICON,type:'image',action:'placeholder',modernOnly:true,inFolder:true
- };
-}
-
 function v53ApplyShellArt(){
  const dc=apps.find(a=>a.id==='dorukcraft');
  if(dc){dc.image=V53_DORUKCRAFT_ICON;dc.type='image'}
@@ -4729,11 +4724,6 @@ function v53SyncModernOnlyApps(){
    if(!modern){apps.splice(i,1);changed=true}
    else apps.splice(i,1);
   }
- }
- if(modern){
-  const lib=Math.max(0,apps.findIndex(a=>a.id==='library'));
-  apps.splice(lib>=0?lib:apps.length,0,v53SharpsPlayroomApp());
-  changed=true;
  }
  ensureLibraryLast();
  S.app=Math.max(0,Math.min(S.app,Math.max(0,apps.length-1)));
@@ -4800,7 +4790,7 @@ updateDebug=function(...args){
  const out=v53DebugBase(...args),d=document.querySelector('#debug');
  if(d&&!d.classList.contains('hidden')){
   d.textContent=d.textContent.replace(/^v0\.\d+/m,'v0.53');
-  d.textContent+='\nforegroundOwner='+(window.__ds53InputOwner?.current?.()||'pending')+' modernOnly=sharps-playroom';
+  d.textContent+='\nforegroundOwner='+(window.__ds53InputOwner?.current?.()||'pending');
  }
  return out;
 };

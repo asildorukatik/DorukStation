@@ -1,3 +1,27 @@
+# DorukStation Web v0.67 — Device Roles + E-Controller
+
+- New startup role selector: **DorukStation**, **E-Controller**, or **Permanent DorukStation**.
+- Normal DorukStation selection uses the selecting device input to choose the initial session controls.
+- Permanent DorukStation skips the role selector on future boots and shows **Connect a controller to play** while still accepting keyboard/mouse/touch.
+- E-Controller turns a phone/tablet into the existing DorukStation touch-controller layout on a black background.
+- GitHub Pages E-Controller pairing uses a six-digit code and WebRTC DataChannels through PeerJS Cloud signaling.
+- Incoming phone controllers require an explicit **Connect / Decline** prompt on DorukStation.
+- Accepted E-Controllers enter the existing controller/user-assignment system as standard Gamepad-like devices and support game vibration feedback where the browser exposes vibration.
+- Settings → **Device Role** can enable/disable Permanent DorukStation or restart into the role chooser.
+- The v0.65 DorukOS bridge remains intact for the later native OS; this release only updates the web shell/prototype.
+
+---
+
+# DorukStation Web v0.66 — Live GitHub Store
+
+- DorukStation Store now reads `asildorukatik/DorukStation-Game-Library` live.
+- It loads the official `catalog.json` (`format: 1` + `items`) when present, then listed `Outer/manifest.json` files.
+- Until `catalog.json` is published, it falls back to the current repository `README.md` entries.
+- Sharp's Playroom has been removed from the Modern debug Home and Store fallback.
+- v0.65 OS sync and external-media support is retained.
+
+---
+
 # DorukStation Web v0.59 — Store Navigation + What's New
 
 This build refines the v0.57 Store and adds the linked-manifest game-library format.
@@ -84,3 +108,34 @@ The foreground input owner now treats only DorukStation's trusted hidden file pi
 - Classic Home focused icons expand to the reference-sized large card (~1.7× normal).
 - Selected tiles use a unified icon + action frame; What’s New shows the down-arrow strip and launchable items show Start.
 - Library and Modern focus states receive stronger visual emphasis.
+
+## E-Controller discovery fix
+
+- E-Controller mode now shows a real searching screen instead of a blank viewport.
+- Two DorukStation tabs on the same site/browser discover each other automatically using BroadcastChannel.
+- The virtual controller controls remain hidden until the DorukStation connection is accepted.
+- Phone ↔ laptop still supports the six-digit code as the cross-device fallback.
+- The DorukStation E-Controller pairing badge/request UI is visible only on Home and never overlays a running game/app. Already-connected E-Controllers keep sending gamepad input while a game is running.
+
+
+## E-Controller battery and disconnect
+
+- Connected E-Controllers report device battery percentage when the browser supports the Battery Status API. The value is exposed through the same controller battery path DorukStation already uses.
+- A **Disconnect** button appears only after E-Controller pairing succeeds. Hold it for **2 seconds** to disconnect.
+- DorukStation receives a disconnecting notification on initial press and a final disconnected notification after the completed hold. Releasing early cancels the disconnect.
+- When disconnected, the phone/tablet hides controller controls and returns to **Searching for a DorukStation…**.
+
+
+## Patch — manual DorukStation search + station IDs
+- E-Controller no longer treats unsolicited discovery broadcasts as a found DorukStation.
+- Discovery begins only after **Search for DorukStation** is pressed. Each search uses a fresh nonce and protocol v2; stale/legacy replies are ignored.
+- Search results are shown as a list with a **Connect** button beside every discovered DorukStation.
+- DorukStation Home now shows a four-letter identity such as **DorukStation - QFRA** below the six-digit E-Controller code.
+- Same-origin web discovery resolves duplicate four-letter IDs during an active search. Native DorukStationOS will additionally check Bluetooth/BlueZ advertisements before claiming an ID; a static GitHub Pages page cannot scan arbitrary Bluetooth names in the background.
+- If no station answers, E-Controller shows **No DorukStations found** and **Search Again**; the six-digit code remains available for phone ↔ laptop pairing.
+
+## v0.67 web-first E-Controller discovery
+
+E-Controller now begins browser-visible local discovery automatically and exposes separate **Refresh LAN** and **Search Bluetooth** controls. Results share one list and are labelled by transport. The same four-letter DorukStation found through multiple transports is merged into one row.
+
+For the static GitHub Pages build, the six-digit WebRTC pairing code remains the reliable way to connect separate physical devices. Browser security rules do not allow a static page to perform unrestricted LAN-wide discovery; Bluetooth is used only when the browser exposes Web Bluetooth. Native DorukStationOS can later provide true LAN/Bluetooth discovery through the OS bridge without changing the controller UI.
